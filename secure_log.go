@@ -5,7 +5,12 @@ import (
 	"strings"
 )
 
-// SafeLogRequest logs request information without exposing sensitive cryptographic data
+// SafeLogRequest logs a request while redacting sensitive cryptographic fields.
+// 
+// If req is nil it logs "Request: nil". If req.Client is nil it logs the request
+// with "cmd=unknown" and "idk=nil" using the provided IP address. Otherwise it
+// logs the client command with newlines removed, the Idk truncated for display,
+// and a masked IP address to avoid exposing full sensitive values.
 func SafeLogRequest(req *CliRequest) {
 	if req == nil {
 		log.Printf("Request: nil")
@@ -22,7 +27,10 @@ func SafeLogRequest(req *CliRequest) {
 		maskIP(req.IPAddress))
 }
 
-// SafeLogIdentity logs identity information without exposing full keys
+// SafeLogIdentity logs a short, privacy-preserving summary of an identity.
+// If identity is nil it logs "Identity: nil". Otherwise it logs the identity
+// key truncated to 8 characters followed by "..." , the Disabled flag, and
+// whether the Rekeyed field is non-empty.
 func SafeLogIdentity(identity *SqrlIdentity) {
 	if identity == nil {
 		log.Printf("Identity: nil")
@@ -34,7 +42,8 @@ func SafeLogIdentity(identity *SqrlIdentity) {
 		identity.Rekeyed != "")
 }
 
-// SafeLogResponse logs response information without exposing sensitive data
+// SafeLogResponse logs a response's nut and TIF while redacting sensitive data.
+// If resp is nil it logs "Response: nil". Otherwise it logs the nut truncated to at most 8 characters followed by "..." and the TIF formatted in hexadecimal (prefixed with 0x).
 func SafeLogResponse(resp *CliResponse) {
 	if resp == nil {
 		log.Printf("Response: nil")
@@ -45,7 +54,8 @@ func SafeLogResponse(resp *CliResponse) {
 		resp.TIF)
 }
 
-// SafeLogError logs error information safely
+// SafeLogError logs the provided error with the given context if err is non-nil.
+// If err is nil, it performs no action.
 func SafeLogError(context string, err error) {
 	if err == nil {
 		return
@@ -53,7 +63,8 @@ func SafeLogError(context string, err error) {
 	log.Printf("Error [%s]: %v", context, err)
 }
 
-// SafeLogAuth logs authentication events without sensitive data
+// SafeLogAuth logs an authentication event with the identity key truncated for privacy.
+// It records the event name, the idk truncated to at most 8 characters (followed by an ellipsis), and whether the authentication succeeded.
 func SafeLogAuth(event string, idk string, success bool) {
 	log.Printf("Auth [%s]: idk=%s..., success=%v",
 		event,
@@ -62,7 +73,9 @@ func SafeLogAuth(event string, idk string, success bool) {
 }
 
 // truncateKey safely truncates a key for logging purposes and sanitizes control characters
-// to prevent log injection attacks
+// truncateKey returns a sanitized, log-safe representation of key truncated to at most maxLen characters.
+// If key is empty it returns "(empty)". Control characters are replaced with spaces to prevent log injection,
+// and the resulting string is cut to maxLen when longer than that.
 func truncateKey(key string, maxLen int) string {
 	if key == "" {
 		return "(empty)"
@@ -79,7 +92,8 @@ func truncateKey(key string, maxLen int) string {
 }
 
 // sanitizeControlChars replaces control characters with safe visible tokens
-// to prevent log injection attacks
+// sanitizeControlChars replaces control characters in s with spaces to prevent log injection.
+// It substitutes newline, carriage return, tab, NUL, escape, and any ASCII code less than 32 or 127 with a space and returns the resulting string.
 func sanitizeControlChars(s string) string {
 	result := make([]byte, 0, len(s))
 	for i := 0; i < len(s); i++ {
@@ -107,7 +121,12 @@ func sanitizeControlChars(s string) string {
 	return string(result)
 }
 
-// maskIP partially masks an IP address for privacy
+// maskIP partially masks an IP address for privacy.
+// If ip is empty it returns "(no-ip)". For IPv6 addresses it returns the first
+// colon-separated segment followed by ":***". For IPv4 addresses it masks the
+// last two octets as "a.b.*.*". For other formats, if the input is longer than
+// eight characters it returns the first four characters plus "***", otherwise
+// it returns the input unchanged.
 func maskIP(ip string) string {
 	if ip == "" {
 		return "(no-ip)"

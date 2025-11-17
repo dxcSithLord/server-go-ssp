@@ -302,7 +302,18 @@ func (cr *CliRequest) ValidateLastResponse(lastRepsonse []byte) bool {
 
 // ParseCliRequest parses and validates the request. The CliRequest
 // can be trusted if no error is returned as the signatures have been
-// checked.
+// ParseCliRequest reads an HTTP POST for the /cli.sqrl endpoint, parses its form fields,
+// constructs a CliRequest, and verifies the client's signature.
+//
+// The request body must be application/x-www-form-urlencoded and include the `client` field
+// (Sqrl64-encoded client payload). The function decodes and parses the client payload into
+// a ClientBody, populates the returned CliRequest's Server, Ids, Pids, and Urs fields, and
+// performs cryptographic signature verification.
+//
+// Errors are returned for failures reading the request body, parsing the form, decoding or
+// parsing the client payload, constructing the ClientBody, or for signature verification
+// failures. Sensitive intermediate buffers (request body, decoded client data, and other
+// decoded cryptographic material) are securely cleared from memory before the function returns.
 func ParseCliRequest(r *http.Request) (*CliRequest, error) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
