@@ -54,7 +54,9 @@ func main() {
 		Vuk:      "GdEBlxqMeZeHhjmEnWInBQTs0zcO6wkqc23o2oATfiw",
 		Pidk:     "",
 	}
-	_ = authStore.SaveIdentity(idSeed)
+	if err := authStore.SaveIdentity(idSeed); err != nil {
+		log.Printf("Failed to save initial identity: %v", err)
+	}
 
 	hph := &homepagehandler.TemplatedAssets{
 		API: sspAPI,
