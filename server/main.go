@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	ssp "github.com/sqrldev/server-go-ssp"
-	"github.com/sqrldev/server-go-ssp/server/homepagehandler"
+	ssp "github.com/dxcSithLord/server-go-ssp"
+	"github.com/dxcSithLord/server-go-ssp/server/homepagehandler"
 )
 
 var certFile, keyFile string

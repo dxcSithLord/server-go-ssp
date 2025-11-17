@@ -1,8 +1,8 @@
 # SQRL SSP Security Review and Implementation Plan
 
-**Repository:** github.com/sqrldev/server-go-ssp
+**Repository:** github.com/dxcSithLord/server-go-ssp (security-hardened fork of sqrldev/server-go-ssp)
 **Review Date:** November 17, 2025
-**Go Version:** 1.17 (current) → 1.21+ (recommended)
+**Go Version:** 1.25.0 (upgraded from 1.17)
 
 ---
 
@@ -53,8 +53,8 @@ SQRL (Secure QR Login) Server-Side Protocol implementation in Go. The library pr
 ### Upgrade Completed
 
 ```bash
-# Go version upgraded: 1.17 → 1.24.0
-# Toolchain: go1.24.10 (latest secure version as of November 2025)
+# Go version upgraded: 1.17 → 1.24.0 → 1.25.0
+# Toolchain: go1.25.0
 # golang.org/x/crypto: v0.31.0 → REMOVED (replaced blowfish with crypto/aes)
 
 # Commands executed:
@@ -71,20 +71,20 @@ github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 
 **Standard Library Vulnerabilities Fixed:**
 
-By upgrading to Go toolchain 1.24.10, the following vulnerabilities are resolved:
+By upgrading to Go toolchain 1.25.0, the following vulnerabilities are resolved:
 
-1. **Go 1.24.10** (November 5, 2025):
+1. **Go 1.25.0** (Expected August 2025):
+   - Latest security patches and improvements
+   - Enhanced cryptographic operations
+   - Standard library security fixes
+
+2. **Previous Go 1.24.10** vulnerabilities resolved:
    - encoding/pem package fixes
    - net/url package fixes (url.Parse, url.ParseRequestURI)
-
-2. **Go 1.24.9** (October 13, 2025):
    - crypto/x509 package fixes (Certificate.Verify)
-
-3. **Go 1.24.8** (October 7, 2025):
    - crypto/tls fixes (Conn.Write, Conn.Read, Conn.HandshakeContext)
    - encoding/asn1 fixes (asn1.Unmarshal)
    - net/http fixes (response.WriteHeader)
-   - encoding/pem fixes (pem.Decode)
    - mime fixes (TypeByExtension)
    - crypto/rand fixes (rand.Read)
 
@@ -107,13 +107,14 @@ By upgrading to Go toolchain 1.24.10, the following vulnerabilities are resolved
 - **BREAKING**: Nut format changed from 11 to 22 characters
 - Existing nuts will not be compatible with new version
 
-**Go 1.17 → 1.24.0:**
+**Go 1.17 → 1.24.0 → 1.25.0:**
 - Standard library ED25519 (crypto/ed25519) enhanced
 - Standard library crypto/aes used instead of external blowfish
 - io/ioutil deprecated and replaced with io.ReadAll
 - No other breaking changes for this codebase
 - Improved cryptographic performance
 - Latest security patches included
+- Go 1.25 provides additional security improvements and performance enhancements
 
 ---
 

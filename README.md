@@ -12,8 +12,10 @@ of session management you desire. It also allows pluggable storage options and s
 
 This project is still very much a work in-progress. All the endpoints log a ton of debugging information.
 
-[![Documentation](https://godoc.org/github.com/sqrldev/server-go-ssp?status.svg)](https://godoc.org/github.com/sqrldev/server-go-ssp)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sqrldev/server-go-ssp)](https://goreportcard.com/report/github.com/sqrldev/server-go-ssp)
+[![Documentation](https://godoc.org/github.com/dxcSithLord/server-go-ssp?status.svg)](https://godoc.org/github.com/dxcSithLord/server-go-ssp)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dxcSithLord/server-go-ssp)](https://goreportcard.com/report/github.com/dxcSithLord/server-go-ssp)
+
+> **Note:** This is a security-hardened fork of [github.com/sqrldev/server-go-ssp](https://github.com/sqrldev/server-go-ssp). See [SECURITY_REVIEW.md](SECURITY_REVIEW.md) for details on security improvements.
 
 ## Integration ##
 The ssp.SqrlSspAPI struct is a configurable server that exposes http.HandlerFuncs that implement the SSP API. The main one

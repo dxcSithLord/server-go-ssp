@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// Ensure log is used (for future debugging if needed)
+var _ = log.Printf
+
 //
 
 // TIF bitflags
