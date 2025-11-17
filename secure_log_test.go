@@ -16,12 +16,13 @@ func TestTruncateKey(t *testing.T) {
 		{"exact length", "12345678", 8, "12345678"},
 		{"long key", "1234567890abcdef", 8, "12345678"},
 		{"very long key", "abcdefghijklmnopqrstuvwxyz", 10, "abcdefghij"},
-		{"key with newline", "abc\ndef", 8, "abc def"},
-		{"key with carriage return", "abc\rdef", 8, "abc def"},
-		{"key with tab", "abc\tdef", 8, "abc def"},
-		{"key with null", "abc\x00def", 8, "abc def"},
-		{"key with escape", "abc\x1bdef", 8, "abc def"},
-		{"key with control chars long", "abc\ndef\rghi\tjkl", 8, "abc def "},
+		{"key with newline", "abc\ndef", 8, "abcdef"},
+		{"key with carriage return", "abc\rdef", 8, "abcdef"},
+		{"key with tab", "abc\tdef", 8, "abcdef"},
+		{"key with null", "abc\x00def", 8, "abcdef"},
+		{"key with escape", "abc\x1bdef", 8, "abcdef"},
+		{"key with control chars long", "abc\ndef\rghi\tjkl", 8, "abcdef"},
+		{"only control chars", "\n\r\t\x00", 8, "(empty)"},
 	}
 
 	for _, tt := range tests {

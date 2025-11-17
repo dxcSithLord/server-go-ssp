@@ -61,8 +61,28 @@ SQRL (Secure QR Login) Server-Side Protocol implementation in Go. The library pr
 go get golang.org/x/crypto@v0.44.0
 go mod tidy
 go mod verify  # Result: all modules verified
-go test ./...  # Result: all tests pass, 33.7% coverage
+go test ./...  # Result: all tests pass, 34.8% coverage
+
+# Current dependencies (go list -m all):
+github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
+golang.org/x/crypto v0.44.0
+golang.org/x/net v0.46.0
+golang.org/x/sys v0.38.0
+golang.org/x/term v0.37.0
+golang.org/x/text v0.31.0
 ```
+
+### Dependency Vulnerability Notes
+
+**Sync reports 55 vulnerabilities** - This requires investigation:
+
+1. **Primary dependencies are current** - golang.org/x/crypto v0.44.0 is latest
+2. **Transitive dependencies updated** - All x/ packages at recent versions
+3. **github.com/skip2/go-qrcode** - No formal releases, may contain historical CVEs
+4. **Recommended actions:**
+   - Run `govulncheck ./...` for Go-specific vulnerability analysis
+   - Consider replacing go-qrcode with actively maintained alternative
+   - Monitor for CVEs affecting actual code paths (not just imported packages)
 
 ### Breaking Changes Assessment
 

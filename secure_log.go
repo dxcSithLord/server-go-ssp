@@ -6,7 +6,7 @@ import (
 )
 
 // SafeLogRequest logs a request while redacting sensitive cryptographic fields.
-// 
+//
 // If req is nil it logs "Request: nil". If req.Client is nil it logs the request
 // with "cmd=unknown" and "idk=nil" using the provided IP address. Otherwise it
 // logs the client command with newlines removed, the Idk truncated for display,
@@ -55,19 +55,25 @@ func SafeLogResponse(resp *CliResponse) {
 }
 
 // SafeLogError logs the provided error with the given context if err is non-nil.
-// If err is nil, it performs no action.
+// If err is nil, it performs no action. The context parameter is sanitized to
+// prevent log injection attacks.
 func SafeLogError(context string, err error) {
 	if err == nil {
 		return
 	}
-	log.Printf("Error [%s]: %v", context, err)
+	// Sanitize context to prevent log injection
+	safeContext := sanitizeControlChars(context)
+	log.Printf("Error [%s]: %v", safeContext, err)
 }
 
 // SafeLogAuth logs an authentication event with the identity key truncated for privacy.
 // It records the event name, the idk truncated to at most 8 characters (followed by an ellipsis), and whether the authentication succeeded.
+// The event parameter is sanitized to prevent log injection attacks.
 func SafeLogAuth(event string, idk string, success bool) {
+	// Sanitize event to prevent log injection
+	safeEvent := sanitizeControlChars(event)
 	log.Printf("Auth [%s]: idk=%s..., success=%v",
-		event,
+		safeEvent,
 		truncateKey(idk, 8),
 		success)
 }
@@ -101,7 +107,6 @@ func truncateKey(key string, maxLen int) string {
 	return safe
 }
 
-// sanitizeControlChars replaces control characters with safe visible tokens
 // sanitizeControlChars replaces control characters in s with spaces to prevent log injection.
 // It substitutes newline, carriage return, tab, NUL, escape, and any ASCII code less than 32 or 127 with a space and returns the resulting string.
 func sanitizeControlChars(s string) string {
@@ -145,7 +150,7 @@ func maskIP(ip string) string {
 	ip = strings.ReplaceAll(ip, "\n", "")
 	ip = strings.ReplaceAll(ip, "\r", "")
 	ip = strings.ReplaceAll(ip, "\t", "")
-	
+
 	// Mask based on IP structure
 	if strings.Contains(ip, ":") {
 		// IPv6: show only first segment
