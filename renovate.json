@@ -1,0 +1,87 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    "security:openssf-scorecard"
+  ],
+  "description": "Renovate configuration for SQRL SSP security-hardened fork",
+  "labels": ["dependencies", "security"],
+  "assignees": ["dxcSithLord"],
+  "prHourlyLimit": 5,
+  "prConcurrentLimit": 10,
+  "semanticCommits": "enabled",
+  "dependencyDashboard": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security", "high-priority"]
+  },
+  "packageRules": [
+    {
+      "description": "Pin GitHub Actions to full SHA for supply chain security",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "commitMessagePrefix": "chore(security):",
+      "labels": ["dependencies", "security", "ci"]
+    },
+    {
+      "description": "Auto-merge minor/patch updates for trusted actions",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": [
+        "actions/checkout",
+        "actions/setup-go",
+        "actions/upload-artifact"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash",
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    },
+    {
+      "description": "Security-critical actions require manual review",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": [
+        "securego/gosec",
+        "github/codeql-action",
+        "golangci/golangci-lint-action"
+      ],
+      "automerge": false,
+      "labels": ["security", "manual-review"],
+      "prPriority": 10
+    },
+    {
+      "description": "Go module updates",
+      "matchManagers": ["gomod"],
+      "enabled": true,
+      "rangeStrategy": "bump",
+      "labels": ["dependencies", "go"]
+    },
+    {
+      "description": "Security updates - high priority",
+      "matchUpdateTypes": ["pin", "digest"],
+      "prPriority": 20,
+      "labels": ["security"]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update gosec SHA in CI workflow with checksum verification",
+      "fileMatch": ["\\.github/workflows/ci\\.yml$"],
+      "matchStrings": [
+        "uses:\\s+securego/gosec@(?<currentDigest>[a-f0-9]+)\\s*#\\s*v?(?<currentValue>[\\d.]+)"
+      ],
+      "depNameTemplate": "securego/gosec",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver",
+      "extractVersionTemplate": "^v?(?<version>.*)$"
+    }
+  ],
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths"
+  ],
+  "schedule": [
+    "before 6am on Monday"
+  ],
+  "timezone": "UTC"
+}

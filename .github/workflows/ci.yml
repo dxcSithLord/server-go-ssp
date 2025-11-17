@@ -29,11 +29,11 @@ jobs:
           cache: true
 
       - name: Run Gosec Security Scanner
-        # SECURITY: Using pinned version tag instead of floating @master ref
-        # For maximum security, verify the commit SHA for this tag at:
-        # https://github.com/securego/gosec/releases/tag/v2.22.0
-        # and replace with: securego/gosec@<FULL_COMMIT_SHA>
-        uses: securego/gosec@v2.22.0
+        # SECURITY: Pinned to specific commit SHA for v2.22.10 (immutable)
+        # v2.22.10 supports Go 1.25.3/1.24.9, released Oct 15, 2025
+        # Checksum verification: https://github.com/securego/gosec/releases/download/v2.22.10/gosec_2.22.10_checksums.txt
+        # GPG signature: https://github.com/securego/gosec/releases/download/v2.22.10/gosec_2.22.10_checksums.txt.gpg
+        uses: securego/gosec@6be2b51fd78feca86af91f5186b7964d76cb1256 # v2.22.10
         with:
           args: '-no-fail -fmt sarif -out results.sarif ./...'
 
