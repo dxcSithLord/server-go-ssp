@@ -1,7 +1,6 @@
 package ssp
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -295,9 +294,4 @@ func BenchmarkRemoteIP(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		api.RemoteIP(req)
 	}
-}
-
-// Test helper function for creating test requests
-func createTestRequest(method, path string) *http.Request {
-	return httptest.NewRequest(method, path, nil)
 }

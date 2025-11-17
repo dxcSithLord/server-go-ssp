@@ -39,7 +39,7 @@ func (api *SqrlSspAPI) Nut(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		w.Write(enc)
+		_, _ = w.Write(enc)
 		return
 	}
 	w.Header().Add("Content-Type", "application/x-www-form-urlencoded")
@@ -75,7 +75,7 @@ func (api *SqrlSspAPI) createAndSaveNut(r *http.Request) (*HoardCache, error) {
 		PagNut:      pagnut,
 	}
 	// store the nut in the hoard
-	api.hoard.Save(nut, hoardCache, api.NutExpiration)
+	err = api.hoard.Save(nut, hoardCache, api.NutExpiration)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to save a nut: %v", err)
 	}
@@ -120,7 +120,7 @@ func (api *SqrlSspAPI) PNG(w http.ResponseWriter, r *http.Request) {
 	png, err := qrcode.Encode(value, qrcode.Medium, -5)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed create of PNG"))
+		_, _ = w.Write([]byte("Failed create of PNG"))
 		return
 	}
 
@@ -130,7 +130,7 @@ func (api *SqrlSspAPI) PNG(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Sqrl-Exp", fmt.Sprintf("%d", api.NutExpirationSeconds()))
 	}
 	w.Header().Add("Content-Type", "image/png")
-	w.Write(png)
+	_, _ = w.Write(png)
 }
 
 type pagJSON struct {
@@ -142,13 +142,13 @@ func (api *SqrlSspAPI) Pag(w http.ResponseWriter, r *http.Request) {
 	nut := r.URL.Query().Get("nut")
 	if nut == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Missing required nut parameter"))
+		_, _ = w.Write([]byte("Missing required nut parameter"))
 		return
 	}
 	pagnut := r.URL.Query().Get("pag")
 	if pagnut == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Missing required pag parameter"))
+		_, _ = w.Write([]byte("Missing required pag parameter"))
 		return
 	}
 
@@ -160,7 +160,7 @@ func (api *SqrlSspAPI) Pag(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("Failed nut lookup: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed nut lookup"))
+		_, _ = w.Write([]byte("Failed nut lookup"))
 		return
 	}
 
@@ -173,7 +173,7 @@ func (api *SqrlSspAPI) Pag(w http.ResponseWriter, r *http.Request) {
 	if hoardCache.Identity == nil {
 		log.Printf("Nil identity on pag hoardCache")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Missing identity"))
+		_, _ = w.Write([]byte("Missing identity"))
 		return
 	}
 
@@ -188,9 +188,9 @@ func (api *SqrlSspAPI) Pag(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		w.Write(enc)
+		_, _ = w.Write(enc)
 		return
 	}
 
-	w.Write([]byte(api.Authenticator.AuthenticateIdentity(hoardCache.Identity)))
+	_, _ = w.Write([]byte(api.Authenticator.AuthenticateIdentity(hoardCache.Identity)))
 }

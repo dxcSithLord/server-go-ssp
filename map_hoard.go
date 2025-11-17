@@ -47,7 +47,7 @@ func (mh *MapHoard) cleaner() {
 			i++
 			// check for going over time
 			if i%100 == 0 {
-				if time.Now().Sub(start) > 50*time.Millisecond {
+				if time.Since(start) > 50*time.Millisecond {
 					break
 				}
 			}

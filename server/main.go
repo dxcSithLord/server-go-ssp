@@ -54,7 +54,7 @@ func main() {
 		Vuk:      "GdEBlxqMeZeHhjmEnWInBQTs0zcO6wkqc23o2oATfiw",
 		Pidk:     "",
 	}
-	authStore.SaveIdentity(idSeed)
+	_ = authStore.SaveIdentity(idSeed)
 
 	hph := &homepagehandler.TemplatedAssets{
 		API: sspAPI,

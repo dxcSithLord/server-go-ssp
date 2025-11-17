@@ -19,7 +19,7 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Req: %v", r.URL)
 	nut := Nut(r.URL.Query().Get("nut"))
 	if nut == "" {
-		w.Write(NewCliResponse("", "").WithClientFailure().Encode())
+		_, _ = w.Write(NewCliResponse("", "").WithClientFailure().Encode())
 		return
 	}
 
@@ -28,7 +28,7 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	req, err := ParseCliRequest(r)
 	if err != nil {
 		log.Printf("Can't parse body or bad signature: %v", err)
-		w.Write(response.WithClientFailure().WithCommandFailed().Encode())
+		_, _ = w.Write(response.WithClientFailure().WithCommandFailed().Encode())
 		return
 	}
 	// Signature is OK from here on!
@@ -141,7 +141,7 @@ func (api *SqrlSspAPI) writeResponse(req *CliRequest, response *CliResponse, w h
 			log.Printf("Saved nut %v in hoard", response.Nut)
 		}
 	}
-	w.Write(respBytes)
+	_, _ = w.Write(respBytes)
 	log.Println()
 }
 

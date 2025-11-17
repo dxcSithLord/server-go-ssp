@@ -132,10 +132,6 @@ func encodeButton(button, url string) string {
 	return ""
 }
 
-func removeTilde(v string) string {
-	return strings.Replace(v, "~", "", -1)
-}
-
 func removeSemi(v string) string {
 	return strings.Replace(v, ";", "", -1)
 }

@@ -345,7 +345,7 @@ func BenchmarkParseSqrlQuery(b *testing.B) {
 	query := "ver=1\r\ncmd=query\r\nopt=sqrlonly~hardlock\r\nidk=testkey123\r\nsuk=testsuk\r\nvuk=testvuk\r\n"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ParseSqrlQuery(query)
+		_, _ = ParseSqrlQuery(query)
 	}
 }
 
@@ -361,7 +361,7 @@ func BenchmarkClientBodyFromParams(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ClientBodyFromParams(params)
+		_, _ = ClientBodyFromParams(params)
 	}
 }
 

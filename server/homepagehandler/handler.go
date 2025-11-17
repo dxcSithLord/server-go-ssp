@@ -65,5 +65,5 @@ func (ta *TemplatedAssets) Handle(w http.ResponseWriter, r *http.Request) {
 	if ct != "" {
 		w.Header().Add("Content-Type", ct)
 	}
-	w.Write(bytes)
+	_, _ = w.Write(bytes)
 }
