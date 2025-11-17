@@ -47,12 +47,12 @@ This document outlines the comprehensive plan for upgrading the SQRL SSP codebas
   go mod edit -go=1.25.0
 
   # Set toolchain to latest stable
-  go mod edit -toolchain=go1.25.0
+  go mod edit -toolchain=go1.25.4
 
   # Tidy modules
   go mod tidy
   ```
-  **Status:** Updated to go 1.25.0 with toolchain go1.25.0
+  **Status:** Updated to go 1.25.0 with toolchain go1.25.4 (latest patch)
 
 - [ ] **2.2 Replace Deprecated Code Patterns**
   - Replace any deprecated standard library usage
@@ -259,8 +259,8 @@ Track fixes from go1.25.0 through go1.25.4:
 
 | Package | Current Version | Target Version | Notes |
 |---------|----------------|----------------|-------|
-| Go | 1.25.0 | 1.25.x | Upgraded from 1.17 -> 1.24 -> 1.25 |
-| github.com/skip2/go-qrcode | v0.0.0-20200617195104 | Verify compatibility | Test with Go 1.25 |
+| Go | 1.25.4 | 1.25.x | Upgraded from 1.17 -> 1.24 -> 1.25.4 ✅ |
+| github.com/skip2/go-qrcode | v0.0.0-20200617195104 | v0.0.0-20200617195104 | Compatible with Go 1.25 ✅ |
 
 ---
 

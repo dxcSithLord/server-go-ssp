@@ -2,7 +2,7 @@
 
 **Repository:** github.com/dxcSithLord/server-go-ssp (security-hardened fork of sqrldev/server-go-ssp)
 **Review Date:** November 17, 2025
-**Go Version:** 1.25.0 (upgraded from 1.17)
+**Go Version:** 1.25.4 (upgraded from 1.17, latest security patch)
 
 ---
 
@@ -53,8 +53,8 @@ SQRL (Secure QR Login) Server-Side Protocol implementation in Go. The library pr
 ### Upgrade Completed
 
 ```bash
-# Go version upgraded: 1.17 → 1.24.0 → 1.25.0
-# Toolchain: go1.25.0
+# Go version upgraded: 1.17 → 1.24.0 → 1.25.4
+# Toolchain: go1.25.4 (latest security patch as of November 5, 2025)
 # golang.org/x/crypto: v0.31.0 → REMOVED (replaced blowfish with crypto/aes)
 
 # Commands executed:
@@ -71,12 +71,12 @@ github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 
 **Standard Library Vulnerabilities Fixed:**
 
-By upgrading to Go toolchain 1.25.0, the following vulnerabilities are resolved:
+By upgrading to Go toolchain 1.25.4, the following vulnerabilities are resolved:
 
-1. **Go 1.25.0** (Expected August 2025):
-   - Latest security patches and improvements
-   - Enhanced cryptographic operations
-   - Standard library security fixes
+1. **Go 1.25.4** (November 5, 2025):
+   - Latest security patches for Go 1.25 release
+   - Bug fixes and stability improvements
+   - All security patches from 1.25.0 through 1.25.4 included
 
 2. **Previous Go 1.24.10** vulnerabilities resolved:
    - encoding/pem package fixes
