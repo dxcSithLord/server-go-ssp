@@ -170,7 +170,8 @@ func (api *SqrlSspAPI) finishCliResponse(req *CliRequest, response *CliResponse,
 			return
 		}
 		if req.Client.Opt["cps"] {
-			log.Printf("Setting CPS Auth: %v", authURL)
+			// SECURITY: Sanitize auth URL before logging to prevent log injection
+			SafeLogAuth("cps_auth_set", sanitizeForLog(authURL), true)
 			response.URL = authURL
 		}
 	}

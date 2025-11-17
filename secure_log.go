@@ -136,6 +136,30 @@ func sanitizeControlChars(s string) string {
 	return string(result)
 }
 
+// sanitizeForLog sanitizes a string for safe logging by removing control characters.
+// This is primarily used for URLs and other user-influenced data that could contain
+// log injection attacks. Returns a safe string with all control characters removed.
+func sanitizeForLog(s string) string {
+	if s == "" {
+		return "(empty)"
+	}
+	// Remove all dangerous control characters
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		// Remove newlines, carriage returns, and other control characters
+		if c == '\n' || c == '\r' || c == '\t' || c == 0x1b || c == 0x00 || c < 32 || c == 127 {
+			continue
+		}
+		b.WriteByte(c)
+	}
+	result := b.String()
+	if result == "" {
+		return "(empty)"
+	}
+	return result
+}
+
 // maskIP partially masks an IP address for privacy.
 // If ip is empty it returns "(no-ip)". For IPv6 addresses it returns the first
 // colon-separated segment followed by ":***". For IPv4 addresses it masks the
