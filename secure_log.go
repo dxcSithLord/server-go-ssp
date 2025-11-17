@@ -77,9 +77,27 @@ func maskIP(ip string) string {
 	if ip == "" {
 		return "(no-ip)"
 	}
-	if len(ip) > 10 {
-		// Show only first few characters for identification
-		return ip[:len(ip)/2] + "..."
+	// Sanitize control characters to prevent log injection
+	ip = strings.ReplaceAll(ip, "\n", "")
+	ip = strings.ReplaceAll(ip, "\r", "")
+	ip = strings.ReplaceAll(ip, "\t", "")
+	
+	// Mask based on IP structure
+	if strings.Contains(ip, ":") {
+		// IPv6: show only first segment
+		parts := strings.Split(ip, ":")
+		if len(parts) > 0 {
+			return parts[0] + ":***"
+		}
+	}
+	// IPv4: mask last two octets
+	parts := strings.Split(ip, ".")
+	if len(parts) == 4 {
+		return parts[0] + "." + parts[1] + ".*.*"
+	}
+	// Fallback for unknown format
+	if len(ip) > 8 {
+		return ip[:4] + "***"
 	}
 	return ip
 }
