@@ -5,7 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -315,7 +315,7 @@ func (cr *CliRequest) ValidateLastResponse(lastRepsonse []byte) bool {
 // failures. Sensitive intermediate buffers (request body, decoded client data, and other
 // decoded cryptographic material) are securely cleared from memory before the function returns.
 func ParseCliRequest(r *http.Request) (*CliRequest, error) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed reading post body: %v", err)
 	}
