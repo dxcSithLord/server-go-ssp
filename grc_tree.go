@@ -36,7 +36,21 @@ func (gt *GrcTree) Nut() (Nut, error) {
 	nextValue := atomic.AddUint64(&gt.monotonicCounter, 1)
 	nextValueBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(nextValueBytes, nextValue)
+	defer ClearBytes(nextValueBytes) // Securely clear counter bytes
+
 	encrypted := make([]byte, 8)
 	gt.cipher.Encrypt(encrypted, nextValueBytes)
+	defer ClearBytes(encrypted) // Securely clear encrypted bytes after encoding
+
 	return Nut(Sqrl64.EncodeToString(encrypted)), nil
+}
+
+// Close securely clears the blowfish key material.
+// Should be called when the GrcTree is no longer needed.
+func (gt *GrcTree) Close() {
+	if gt.key != nil {
+		ClearBytes(gt.key)
+		gt.key = nil
+	}
+	gt.cipher = nil
 }

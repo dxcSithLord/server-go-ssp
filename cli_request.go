@@ -225,10 +225,14 @@ func (cr *CliRequest) VerifySignature() error {
 	if err != nil {
 		return err
 	}
+	defer ClearBytes(pubKey) // Securely clear public key after use
+
 	decodedIds, err := Sqrl64.DecodeString(cr.Ids)
 	if err != nil {
 		return fmt.Errorf("invalid ids: %v", err)
 	}
+	defer ClearBytes(decodedIds) // Securely clear signature after use
+
 	if !ed25519.Verify(pubKey, cr.SigningString(), decodedIds) {
 		return fmt.Errorf("signature verification failed")
 	}
@@ -246,10 +250,14 @@ func (cr *CliRequest) VerifyPidsSignature() error {
 	if err != nil {
 		return err
 	}
+	defer ClearBytes(pubKey) // Securely clear public key after use
+
 	decodedPids, err := Sqrl64.DecodeString(cr.Pids)
 	if err != nil {
 		return fmt.Errorf("invalid pids: %v", err)
 	}
+	defer ClearBytes(decodedPids) // Securely clear signature after use
+
 	if !ed25519.Verify(pubKey, cr.SigningString(), decodedPids) {
 		return fmt.Errorf("pids signature verification failed")
 	}
@@ -267,10 +275,14 @@ func (cr *CliRequest) VerifyUrs(vuk string) error {
 	if err != nil {
 		return fmt.Errorf("invalid urs: %v", err)
 	}
+	defer ClearBytes(decodedUrs) // Securely clear signature after use
+
 	pubKey, err := base64.RawURLEncoding.DecodeString(vuk)
 	if err != nil {
 		return fmt.Errorf("can't decode vuk")
 	}
+	defer ClearBytes(pubKey) // Securely clear public key after use
+
 	if len(pubKey) != ed25519.PublicKeySize {
 		return fmt.Errorf("invalid vuk")
 	}
@@ -297,7 +309,10 @@ func ParseCliRequest(r *http.Request) (*CliRequest, error) {
 		return nil, fmt.Errorf("failed reading post body: %v", err)
 	}
 	defer r.Body.Close()
-	log.Printf("Got body: %v", string(body))
+	defer ClearBytes(body) // Securely clear request body after parsing
+
+	// SECURITY: Do not log raw request body as it contains sensitive cryptographic data
+	log.Printf("Received CLI request (body size: %d bytes)", len(body))
 
 	params, err := url.ParseQuery(string(body))
 	if err != nil {
@@ -316,6 +331,8 @@ func ParseCliRequest(r *http.Request) (*CliRequest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("incalid client parameter: %v", err)
 	}
+	defer ClearBytes(decodedClient) // Securely clear decoded client data
+
 	clientParams, err := ParseSqrlQuery(string(decodedClient))
 	if err != nil {
 		return nil, fmt.Errorf("invalid cli.sqrl client body: %v", err)
