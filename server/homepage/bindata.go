@@ -32,7 +32,11 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	_, err = io.Copy(&buf, gz)
+	// SECURITY: Limit decompression to 10MB to prevent decompression bomb DoS attacks
+	// Embedded assets should not exceed this limit in normal operation
+	const maxDecompressedSize = 10 * 1024 * 1024 // 10MB
+	limitedReader := io.LimitReader(gz, maxDecompressedSize)
+	_, err = io.Copy(&buf, limitedReader)
 	clErr := gz.Close()
 
 	if err != nil {

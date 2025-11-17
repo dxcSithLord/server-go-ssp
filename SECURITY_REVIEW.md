@@ -32,7 +32,7 @@ SQRL (Secure QR Login) Server-Side Protocol implementation in Go. The library pr
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Test Coverage | **CRITICAL: 8.0%** | Requires minimum 80% |
+| Test Coverage | **IN PROGRESS: 29.4%** | Requires minimum 80% |
 | CI/CD Pipeline | **MISSING** | No GitHub Actions |
 | Secure Memory Handling | **MISSING** | No clearing of sensitive data |
 | Logging Security | **VULNERABLE** | Logs contain sensitive data |
@@ -436,7 +436,10 @@ func truncateKey(key string, maxLen int) string {
 
 ## 5. Test Coverage Requirements
 
-### Current State: 8.0% Coverage (CRITICAL)
+### Current State: 29.4% Coverage (IN PROGRESS)
+
+Progress: Improved from initial 8.0% to current 29.4% (+21.4 percentage points)
+Remaining: Need +50.6 percentage points to reach 80% minimum threshold
 
 ### Target: 80% Minimum Coverage
 
@@ -740,7 +743,7 @@ This SQRL SSP implementation requires immediate security improvements:
 1. **CRITICAL**: Implement secure memory clearing for cryptographic keys
 2. **CRITICAL**: Remove sensitive data from log outputs
 3. **HIGH**: Update golang.org/x/crypto from v0.31.0 to v0.44.0
-4. **HIGH**: Increase test coverage from 8% to 80%+
+4. **HIGH**: Increase test coverage from 29.4% to 80%+ (in progress, was 8.0%)
 5. **MEDIUM**: Set up comprehensive CI/CD pipeline
 
 The codebase is functionally complete but lacks essential security hardening for production use. The identified vulnerabilities (CWE-226, CWE-200) must be addressed before deploying in security-sensitive environments.
