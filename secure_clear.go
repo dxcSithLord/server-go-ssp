@@ -2,7 +2,6 @@ package ssp
 
 import (
 	"runtime"
-	"unsafe"
 )
 
 // ClearBytes securely clears a byte slice by overwriting with zeros.
@@ -20,37 +19,32 @@ func ClearBytes(b []byte) {
 	runtime.KeepAlive(b)
 }
 
-// ClearString securely clears a string's underlying data by directly accessing
-// the backing memory using unsafe operations.
+// ClearString clears a string reference by setting it to empty string.
 //
-// IMPORTANT LIMITATION: Go strings are immutable by design. This function uses
-// unsafe operations to overwrite the backing memory, but:
-// 1. If the string was interned or shared, other references may still see data
-// 2. String copies created via string() conversion cannot be cleared
-// 3. Small strings may be stored inline and not in separate backing memory
+// IMPORTANT SECURITY LIMITATION: Go strings are immutable by design and may be
+// stored in read-only memory (especially string literals). Unlike languages like C,
+// Go does not support secure memory clearing for strings because:
 //
-// For sensitive data, prefer []byte over string where possible, as byte slices
-// can be reliably cleared with ClearBytes.
+// 1. String literals are stored in read-only program segments
+// 2. Strings may be interned and shared across the program
+// 3. The Go runtime does not provide safe memory clearing APIs for strings
+//
+// This function sets the string pointer to empty string to prevent further access,
+// but the original data may remain in memory until garbage collected.
+//
+// For sensitive data that must be securely cleared, use []byte instead of string
+// and call ClearBytes or ClearBytesSecure. Byte slices are mutable and can be
+// reliably overwritten.
 func ClearString(s *string) {
 	if s == nil || *s == "" {
 		return
 	}
 
-	// Use unsafe.StringData to get pointer to backing array (Go 1.20+)
-	// This accesses the actual memory backing the string
-	ptr := unsafe.StringData(*s)
-	if ptr != nil {
-		// Create a mutable byte slice over the string's backing memory
-		// WARNING: This violates Go's immutability guarantees for strings
-		b := unsafe.Slice(ptr, len(*s))
-		// Clear the backing memory
-		for i := range b {
-			b[i] = 0
-		}
-		runtime.KeepAlive(b)
-	}
-
 	// Set string pointer to empty to prevent further access
+	// NOTE: We cannot safely clear the underlying memory because:
+	// - String literals are in read-only memory (causes SIGSEGV)
+	// - Interned strings may be shared
+	// - The GC will eventually reclaim the memory
 	*s = ""
 	runtime.KeepAlive(s)
 }

@@ -185,15 +185,26 @@ func ClearBytes(b []byte) {
     runtime.KeepAlive(b)
 }
 
-// ClearString securely clears a string (note: strings are immutable,
-// this works on the underlying bytes)
+// ClearString clears a string reference by setting it to empty string.
+//
+// IMPORTANT SECURITY LIMITATION: Go strings are immutable by design and may be
+// stored in read-only memory (especially string literals). Unlike C, Go does not
+// support secure memory clearing for strings because:
+// 1. String literals are stored in read-only program segments (causes SIGSEGV)
+// 2. Strings may be interned and shared across the program
+// 3. The Go runtime does not provide safe memory clearing APIs for strings
+//
+// This function sets the string pointer to empty string to prevent further access,
+// but the original data may remain in memory until garbage collected.
+//
+// For sensitive data that must be securely cleared, use []byte instead of string
+// and call ClearBytes or ClearBytesSecure.
 func ClearString(s *string) {
     if s == nil || *s == "" {
         return
     }
-    b := []byte(*s)
-    ClearBytes(b)
     *s = ""
+    runtime.KeepAlive(s)
 }
 
 // ClearIdentity securely clears all sensitive fields in SqrlIdentity
