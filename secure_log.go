@@ -2,6 +2,7 @@ package ssp
 
 import (
 	"log"
+	"strings"
 )
 
 // SafeLogRequest logs request information without exposing sensitive cryptographic data
@@ -14,8 +15,9 @@ func SafeLogRequest(req *CliRequest) {
 		log.Printf("Request: cmd=unknown, idk=nil, ip=%s", req.IPAddress)
 		return
 	}
+	safeCmd := strings.ReplaceAll(strings.ReplaceAll(req.Client.Cmd, "\n", ""), "\r", "")
 	log.Printf("Request: cmd=%s, idk=%s..., ip=%s",
-		req.Client.Cmd,
+		safeCmd,
 		truncateKey(req.Client.Idk, 8),
 		maskIP(req.IPAddress))
 }
