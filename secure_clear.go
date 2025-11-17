@@ -107,7 +107,8 @@ func memclr(b []byte) {
 	for i := 0; i < len(b); i++ {
 		*(*byte)(unsafe.Add(ptr, i)) = 0
 	}
-	runtime.KeepAlive(ptr)
+	// Keep the original slice alive to ensure backing array remains valid
+	runtime.KeepAlive(b)
 }
 
 // ClearBytesSecure uses the more aggressive clearing method

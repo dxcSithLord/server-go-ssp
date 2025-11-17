@@ -16,6 +16,12 @@ func TestTruncateKey(t *testing.T) {
 		{"exact length", "12345678", 8, "12345678"},
 		{"long key", "1234567890abcdef", 8, "12345678"},
 		{"very long key", "abcdefghijklmnopqrstuvwxyz", 10, "abcdefghij"},
+		{"key with newline", "abc\ndef", 8, "abc def"},
+		{"key with carriage return", "abc\rdef", 8, "abc def"},
+		{"key with tab", "abc\tdef", 8, "abc def"},
+		{"key with null", "abc\x00def", 8, "abc def"},
+		{"key with escape", "abc\x1bdef", 8, "abc def"},
+		{"key with control chars long", "abc\ndef\rghi\tjkl", 8, "abc def "},
 	}
 
 	for _, tt := range tests {
@@ -23,6 +29,36 @@ func TestTruncateKey(t *testing.T) {
 			result := truncateKey(tt.key, tt.maxLen)
 			if result != tt.expected {
 				t.Errorf("truncateKey(%q, %d) = %q, want %q", tt.key, tt.maxLen, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSanitizeControlChars(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"no control chars", "abcdef", "abcdef"},
+		{"newline", "abc\ndef", "abc def"},
+		{"carriage return", "abc\rdef", "abc def"},
+		{"tab", "abc\tdef", "abc def"},
+		{"null byte", "abc\x00def", "abc def"},
+		{"escape char", "abc\x1bdef", "abc def"},
+		{"multiple controls", "a\nb\rc\td", "a b c d"},
+		{"control at start", "\nabc", " abc"},
+		{"control at end", "abc\n", "abc "},
+		{"only controls", "\n\r\t", "   "},
+		{"DEL character", "abc\x7fdef", "abc def"},
+		{"bell character", "abc\x07def", "abc def"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeControlChars(tt.input)
+			if result != tt.expected {
+				t.Errorf("sanitizeControlChars(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}

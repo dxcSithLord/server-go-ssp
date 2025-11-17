@@ -33,6 +33,10 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	}
 	// Signature is OK from here on!
 
+	// SECURITY: Clear sensitive data from request after it's stored in HoardCache
+	// This defer runs AFTER writeResponse due to LIFO order, ensuring data is saved first
+	defer req.Clear()
+
 	// defer writing the response and saving the new nut
 	defer api.writeResponse(req, response, w)
 

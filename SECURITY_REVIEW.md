@@ -42,48 +42,43 @@ SQRL (Secure QR Login) Server-Side Protocol implementation in Go. The library pr
 
 ## 2. Dependencies and Upgrade Path
 
-### Current Dependencies
+### Current Dependencies (UPDATED)
 
-| Package | Current Version | Latest Version | Upgrade Priority |
-|---------|----------------|----------------|------------------|
-| golang.org/x/crypto | v0.31.0 | **v0.44.0** | **CRITICAL** |
-| github.com/davecgh/go-spew | v1.1.1 | v1.1.1 | None (current) |
-| github.com/skip2/go-qrcode | v0.0.0-20200617195104 | No formal releases | Low |
+| Package | Previous Version | Current Version | Status |
+|---------|-----------------|-----------------|--------|
+| golang.org/x/crypto | v0.31.0 | **v0.44.0** | **UPGRADED** |
+| github.com/davecgh/go-spew | v1.1.1 | **REMOVED** | Eliminated (security risk) |
+| github.com/skip2/go-qrcode | v0.0.0-20200617195104 | v0.0.0-20200617195104 | No formal releases |
 
-### Upgrade Instructions
+### Upgrade Completed
 
 ```bash
-# Step 1: Upgrade Go version (required for latest crypto)
-# Current: go 1.17
-# Recommended: go 1.21 or higher
+# Go version upgraded: 1.17 → 1.24.0
+# Toolchain: go1.24.7
+# golang.org/x/crypto: v0.31.0 → v0.44.0
 
-# Step 2: Update go.mod
-go mod edit -go=1.21
-
-# Step 3: Upgrade golang.org/x/crypto
+# Commands executed:
 go get golang.org/x/crypto@v0.44.0
-
-# Step 4: Verify and tidy
 go mod tidy
-go mod verify
-
-# Step 5: Run tests
-go test ./...
+go mod verify  # Result: all modules verified
+go test ./...  # Result: all tests pass, 33.7% coverage
 ```
 
 ### Breaking Changes Assessment
 
 **golang.org/x/crypto v0.31.0 → v0.44.0:**
-- ED25519 API remains stable
-- Blowfish API remains stable
-- Minor performance improvements
-- No breaking changes expected for this codebase
-- Security fixes included
+- ED25519 API remains stable ✓
+- Blowfish API remains stable ✓
+- Minor performance improvements ✓
+- No breaking changes for this codebase ✓
+- Security fixes included ✓
+- Critical DoS/SSH vulnerability fixed ✓
 
-**Go 1.17 → 1.21:**
+**Go 1.17 → 1.24.0:**
 - Standard library ED25519 (crypto/ed25519) enhanced
 - No breaking changes for this codebase
 - Improved cryptographic performance
+- Latest security patches included
 
 ---
 

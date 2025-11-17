@@ -61,15 +61,50 @@ func SafeLogAuth(event string, idk string, success bool) {
 		success)
 }
 
-// truncateKey safely truncates a key for logging purposes
+// truncateKey safely truncates a key for logging purposes and sanitizes control characters
+// to prevent log injection attacks
 func truncateKey(key string, maxLen int) string {
 	if key == "" {
 		return "(empty)"
 	}
-	if len(key) <= maxLen {
-		return key
+
+	// Sanitize control characters first to prevent log injection
+	sanitized := sanitizeControlChars(key)
+
+	// Always truncate to maxLen
+	if len(sanitized) > maxLen {
+		return sanitized[:maxLen]
 	}
-	return key[:maxLen]
+	return sanitized
+}
+
+// sanitizeControlChars replaces control characters with safe visible tokens
+// to prevent log injection attacks
+func sanitizeControlChars(s string) string {
+	result := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch c {
+		case '\n':
+			result = append(result, ' ')
+		case '\r':
+			result = append(result, ' ')
+		case '\t':
+			result = append(result, ' ')
+		case '\x00':
+			result = append(result, ' ')
+		case '\x1b': // Escape character
+			result = append(result, ' ')
+		default:
+			// Replace any other control characters (ASCII 0-31, 127)
+			if c < 32 || c == 127 {
+				result = append(result, ' ')
+			} else {
+				result = append(result, c)
+			}
+		}
+	}
+	return string(result)
 }
 
 // maskIP partially masks an IP address for privacy
