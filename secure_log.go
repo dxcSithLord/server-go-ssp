@@ -1,6 +1,7 @@
 package ssp
 
 import (
+	"fmt"
 	"log"
 	"strings"
 )
@@ -61,9 +62,27 @@ func SafeLogError(context string, err error) {
 	if err == nil {
 		return
 	}
-	// Sanitize context to prevent log injection
+	// Sanitize both context and error message to prevent log injection
 	safeContext := sanitizeControlChars(context)
-	log.Printf("Error [%s]: %v", safeContext, err)
+	safeErr := sanitizeControlChars(err.Error())
+	log.Printf("Error [%s]: %s", safeContext, safeErr)
+}
+
+// SafeLogErrorMsg logs an error message with sanitized context.
+// Use this for error strings that may contain user-controlled data.
+func SafeLogErrorMsg(context string, errMsg string) {
+	safeContext := sanitizeControlChars(context)
+	safeErr := sanitizeControlChars(errMsg)
+	log.Printf("Error [%s]: %s", safeContext, safeErr)
+}
+
+// SafeLogInfo logs an informational message with sanitized content.
+// Use this for any log message that may contain user-controlled data.
+func SafeLogInfo(format string, args ...interface{}) {
+	// Format the message first, then sanitize
+	msg := fmt.Sprintf(format, args...)
+	safeMsg := sanitizeControlChars(msg)
+	log.Print(safeMsg)
 }
 
 // SafeLogAuth logs an authentication event with the identity key truncated for privacy.

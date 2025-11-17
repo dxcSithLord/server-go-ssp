@@ -16,7 +16,8 @@ var supportedCommands = map[string]bool{
 
 // Cli implements the /cli.sqrl endpoint
 func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Req: %v", r.URL)
+	// SECURITY: Sanitize URL before logging to prevent log injection
+	SafeLogInfo("Req: %v", sanitizeForLog(r.URL.String()))
 	nut := Nut(r.URL.Query().Get("nut"))
 	if nut == "" {
 		_, _ = w.Write(NewCliResponse("", "").WithClientFailure().Encode())
@@ -27,7 +28,8 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	response := NewCliResponse(Nut(nut), api.qry(nut))
 	req, err := ParseCliRequest(r)
 	if err != nil {
-		log.Printf("Can't parse body or bad signature: %v", err)
+		// SECURITY: Sanitize error to prevent log injection from user input
+		SafeLogError("parse_request", err)
 		_, _ = w.Write(response.WithClientFailure().WithCommandFailed().Encode())
 		return
 	}
@@ -46,11 +48,12 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	hoardCache, err := api.getAndDelete(Nut(nut))
 	if err != nil {
 		if err == ErrNotFound {
-			log.Printf("Nut %v not found", nut)
+			// SECURITY: Sanitize nut value to prevent log injection
+			SafeLogInfo("Nut %s not found", sanitizeForLog(string(nut)))
 			response.WithClientFailure().WithCommandFailed()
 			return
 		}
-		log.Printf("Failed nut lookup: %v", err)
+		SafeLogError("nut_lookup", err)
 		response.WithTransientError().WithCommandFailed()
 		return
 	}
@@ -71,7 +74,7 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	// generate new nut
 	nut, err = api.tree.Nut()
 	if err != nil {
-		log.Printf("Error generating nut: %v", err)
+		SafeLogError("nut_generation", err)
 		response.WithCommandFailed()
 		return
 	}
@@ -84,7 +87,7 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 
 	identity, err := api.authStore.FindIdentity(req.Client.Idk)
 	if err != nil && err != ErrNotFound {
-		log.Printf("Error looking up identity: %v", err)
+		SafeLogError("identity_lookup", err)
 		response.WithCommandFailed()
 		return
 	}
@@ -134,11 +137,12 @@ func (api *SqrlSspAPI) writeResponse(req *CliRequest, response *CliResponse, w h
 			LastResponse: respBytes,
 		}, api.NutExpiration)
 		if err != nil {
-			log.Printf("Failed saving to hoard: %v", err)
+			SafeLogError("hoard_save", err)
 			response.WithCommandFailed()
 			respBytes = response.Encode()
 		} else {
-			log.Printf("Saved nut %v in hoard", response.Nut)
+			// SECURITY: Sanitize nut before logging
+			SafeLogInfo("Saved nut %s in hoard", sanitizeForLog(string(response.Nut)))
 		}
 	}
 	_, _ = w.Write(respBytes)
@@ -193,10 +197,11 @@ func (api *SqrlSspAPI) finishCliResponse(req *CliRequest, response *CliResponse,
 				Identity:    identity,
 			}, api.NutExpiration)
 			if err != nil {
-				log.Printf("Failed saving to hoard: %v", err)
+				SafeLogError("hoard_save_pagnut", err)
 				response.WithCommandFailed()
 			}
-			log.Printf("Saved pagnut %v in hoard", hoardCache.PagNut)
+			// SECURITY: Sanitize pagnut before logging
+			SafeLogInfo("Saved pagnut %s in hoard", sanitizeForLog(string(hoardCache.PagNut)))
 		}
 	}
 }
@@ -249,18 +254,20 @@ func (api *SqrlSspAPI) requestValidations(hoardCache *HoardCache, req *CliReques
 	// validate the IP if required
 	if hoardCache.RemoteIP != req.IPAddress {
 		if !req.Client.Opt["noiptest"] {
-			log.Printf("Rejecting on IP mis-match orig: %v current: %v", hoardCache.RemoteIP, api.RemoteIP(r))
+			// SECURITY: Mask IP addresses to prevent log injection and maintain privacy
+			SafeLogInfo("Rejecting on IP mis-match orig: %s current: %s", maskIP(hoardCache.RemoteIP), maskIP(api.RemoteIP(r)))
 			response.WithCommandFailed()
 			return fmt.Errorf("validation error")
 		}
 	} else {
-		log.Printf("Matched IP addresses")
+		log.Print("Matched IP addresses")
 		response = response.WithIPMatch()
 	}
 
 	// validating the current request and associated Idk's match
 	if hoardCache.LastRequest != nil && hoardCache.LastRequest.Client.Idk != req.Client.Idk {
-		log.Printf("Identity mismatch orig: %v current %v", hoardCache.LastRequest.Client.Idk, req.Client.Idk)
+		// SECURITY: Truncate identity keys to prevent log injection
+		SafeLogInfo("Identity mismatch orig: %s... current: %s...", truncateKey(hoardCache.LastRequest.Client.Idk, 8), truncateKey(req.Client.Idk, 8))
 		response.WithCommandFailed().WithClientFailure().WithBadIDAssociation()
 		return fmt.Errorf("validation error")
 	}

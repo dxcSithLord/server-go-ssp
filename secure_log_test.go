@@ -159,6 +159,58 @@ func TestSafeLogAuth(t *testing.T) {
 	SafeLogAuth("logout", "short", true)
 }
 
+func TestSanitizeForLog(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"empty string", "", "(empty)"},
+		{"normal string", "hello world", "hello world"},
+		{"URL with newline", "http://example.com/path\ninjected", "http://example.com/pathinjected"},
+		{"URL with carriage return", "http://example.com/path\rinjected", "http://example.com/pathinjected"},
+		{"URL with tab", "http://example.com/\tpath", "http://example.com/path"},
+		{"URL with null byte", "http://example.com/\x00path", "http://example.com/path"},
+		{"URL with escape sequence", "http://example.com/\x1b[31mred", "http://example.com/[31mred"},
+		{"multiple control chars", "a\nb\rc\td\x00e", "abcde"},
+		{"only control chars", "\n\r\t\x00\x1b", "(empty)"},
+		{"complex URL", "https://user:pass@host:8080/path?query=value#fragment", "https://user:pass@host:8080/path?query=value#fragment"},
+		{"path traversal attempt", "../../../etc/passwd", "../../../etc/passwd"},
+		{"with DEL char", "test\x7fvalue", "testvalue"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeForLog(tt.input)
+			if result != tt.expected {
+				t.Errorf("sanitizeForLog(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSafeLogInfo(t *testing.T) {
+	// Test with various inputs that could cause log injection
+	SafeLogInfo("Test message: %s", "normal")
+	SafeLogInfo("Test with newline: %s", "value\ninjected")
+	SafeLogInfo("Test with carriage return: %s", "value\rinjected")
+	SafeLogInfo("Test with format: %d items", 42)
+}
+
+func TestSafeLogErrorMsg(t *testing.T) {
+	SafeLogErrorMsg("test_context", "normal error")
+	SafeLogErrorMsg("test_context", "error\nwith\nnewlines")
+	SafeLogErrorMsg("context\ninjection", "error message")
+}
+
+func BenchmarkSanitizeForLog(b *testing.B) {
+	s := "http://example.com/path?query=value#fragment"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sanitizeForLog(s)
+	}
+}
+
 func BenchmarkTruncateKey(b *testing.B) {
 	key := "abcdefghijklmnopqrstuvwxyz0123456789"
 	b.ResetTimer()
