@@ -54,11 +54,11 @@ func TestGrcUniqueGenerate(t *testing.T) {
 func TestGrcInvalidKeySize(t *testing.T) {
 	// Test that invalid key sizes are rejected
 	invalidKeys := [][]byte{
-		{1, 2, 3, 4},          // Too short
-		{1, 2, 3, 4, 5},       // Invalid size (5 bytes)
-		make([]byte, 15),      // Too short for AES-128
-		make([]byte, 17),      // Invalid size between AES-128 and AES-192
-		make([]byte, 33),      // Too long
+		{1, 2, 3, 4},     // Too short
+		{1, 2, 3, 4, 5},  // Invalid size (5 bytes)
+		make([]byte, 15), // Too short for AES-128
+		make([]byte, 17), // Invalid size between AES-128 and AES-192
+		make([]byte, 33), // Too long
 	}
 
 	for i, key := range invalidKeys {
