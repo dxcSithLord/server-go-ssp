@@ -110,7 +110,7 @@ func (cb *ClientBody) Encode() []byte {
 	}
 
 	encoded := Sqrl64.EncodeToString(b.Bytes())
-	log.Printf("Encoded response: <%v>", encoded)
+	// SECURITY: Do not log encoded payload as it contains sensitive identity material (idk, suk, vuk, pidk)
 	return []byte(encoded)
 
 }
@@ -314,17 +314,25 @@ func (cr *CliRequest) ValidateLastResponse(lastRepsonse []byte) bool {
 // parsing the client payload, constructing the ClientBody, or for signature verification
 // failures. Sensitive intermediate buffers (request body, decoded client data, and other
 // decoded cryptographic material) are securely cleared from memory before the function returns.
+//
+// NOTE: While byte buffers are cleared, Go string copies created during parsing (e.g., via
+// string(body) or url.ParseQuery) cannot be cleared as strings are immutable. These copies
+// remain in memory until garbage collection. For maximum security in production, consider
+// implementing custom parsers that work directly with []byte to avoid string allocation.
 func ParseCliRequest(r *http.Request) (*CliRequest, error) {
+	// Ensure body is closed even if ReadAll fails
+	defer r.Body.Close()
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed reading post body: %v", err)
 	}
-	defer r.Body.Close()
 	defer ClearBytes(body) // Securely clear request body after parsing
 
 	// SECURITY: Do not log raw request body as it contains sensitive cryptographic data
 	log.Printf("Received CLI request (body size: %d bytes)", len(body))
 
+	// NOTE: string(body) creates a copy that cannot be cleared
 	params, err := url.ParseQuery(string(body))
 	if err != nil {
 		return nil, fmt.Errorf("invalid cli.sqrl request: %v", err)

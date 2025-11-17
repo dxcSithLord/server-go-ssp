@@ -269,7 +269,7 @@ func (cr *CliResponse) Encode() []byte {
 	}
 
 	encoded := Sqrl64.EncodeToString(b.Bytes())
-	log.Printf("Encoded response: <%v>", encoded)
+	// SECURITY: Do not log encoded response as it may contain sensitive tokens
 	return []byte(encoded)
 }
 

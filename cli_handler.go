@@ -35,9 +35,10 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	}
 	// Signature is OK from here on!
 
-	// SECURITY: Clear sensitive data from request after it's stored in HoardCache
-	// This defer runs AFTER writeResponse due to LIFO order, ensuring data is saved first
-	defer req.Clear()
+	// NOTE: Do NOT call req.Clear() here - the request object is stored by reference
+	// in HoardCache.LastRequest for validation of subsequent requests. Clearing it
+	// would corrupt the cached data. Request cleanup is handled by HoardCache when
+	// entries expire or are deleted (see MapHoard.cleanup and HoardCache.Clear).
 
 	// defer writing the response and saving the new nut
 	defer api.writeResponse(req, response, w)
@@ -164,19 +165,30 @@ func (api *SqrlSspAPI) finishCliResponse(req *CliRequest, response *CliResponse,
 	if identity != nil {
 		accountDisabled = identity.Disabled
 	}
-	if req.IsAuthCommand() && !accountDisabled {
-		// SECURITY: Use safe logging for identity information
-		SafeLogAuth("authenticate", identity.Idk, true)
-		authURL, err := api.authenticateIdentity(identity, req.Client.Btn)
-		if err != nil {
-			SafeLogError("save_identity", err)
-			response.WithCommandFailed()
+
+	// Guard against nil identity for auth commands
+	// This can happen if FindIdentity returned ErrNotFound and command is not "ident"
+	if req.IsAuthCommand() {
+		if identity == nil {
+			// Cannot authenticate without an identity
+			SafeLogError("auth_nil_identity", fmt.Errorf("auth command with nil identity"))
+			response.WithClientFailure().WithCommandFailed()
 			return
 		}
-		if req.Client.Opt["cps"] {
-			// SECURITY: Sanitize auth URL before logging to prevent log injection
-			SafeLogAuth("cps_auth_set", sanitizeForLog(authURL), true)
-			response.URL = authURL
+		if !accountDisabled {
+			// SECURITY: Use safe logging for identity information
+			SafeLogAuth("authenticate", identity.Idk, true)
+			authURL, err := api.authenticateIdentity(identity, req.Client.Btn)
+			if err != nil {
+				SafeLogError("save_identity", err)
+				response.WithCommandFailed()
+				return
+			}
+			if req.Client.Opt["cps"] {
+				// SECURITY: Sanitize auth URL before logging to prevent log injection
+				SafeLogAuth("cps_auth_set", sanitizeForLog(authURL), true)
+				response.URL = authURL
+			}
 		}
 	}
 
@@ -185,7 +197,7 @@ func (api *SqrlSspAPI) finishCliResponse(req *CliRequest, response *CliResponse,
 		response.WithCommandFailed()
 	}
 
-	if req.IsAuthCommand() && !accountDisabled {
+	if req.IsAuthCommand() && identity != nil && !accountDisabled {
 		// for non-CPS we save the state back to the PagNut for redirect on polling
 		if !req.Client.Opt["cps"] {
 			err := api.hoard.Save(hoardCache.PagNut, &HoardCache{

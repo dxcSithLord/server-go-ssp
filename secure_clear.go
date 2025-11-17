@@ -2,6 +2,7 @@ package ssp
 
 import (
 	"runtime"
+	"unsafe"
 )
 
 // ClearBytes securely clears a byte slice by overwriting with zeros.
@@ -19,18 +20,39 @@ func ClearBytes(b []byte) {
 	runtime.KeepAlive(b)
 }
 
-// ClearString securely clears a string's underlying data.
-// ClearString clears the contents of s by overwriting its underlying bytes and setting it to the empty string.
-// If s is nil or already empty, ClearString does nothing.
+// ClearString securely clears a string's underlying data by directly accessing
+// the backing memory using unsafe operations.
+//
+// IMPORTANT LIMITATION: Go strings are immutable by design. This function uses
+// unsafe operations to overwrite the backing memory, but:
+// 1. If the string was interned or shared, other references may still see data
+// 2. String copies created via string() conversion cannot be cleared
+// 3. Small strings may be stored inline and not in separate backing memory
+//
+// For sensitive data, prefer []byte over string where possible, as byte slices
+// can be reliably cleared with ClearBytes.
 func ClearString(s *string) {
 	if s == nil || *s == "" {
 		return
 	}
-	// Convert string to bytes, clear them
-	b := []byte(*s)
-	ClearBytes(b)
+
+	// Use unsafe.StringData to get pointer to backing array (Go 1.20+)
+	// This accesses the actual memory backing the string
+	ptr := unsafe.StringData(*s)
+	if ptr != nil {
+		// Create a mutable byte slice over the string's backing memory
+		// WARNING: This violates Go's immutability guarantees for strings
+		b := unsafe.Slice(ptr, len(*s))
+		// Clear the backing memory
+		for i := range b {
+			b[i] = 0
+		}
+		runtime.KeepAlive(b)
+	}
+
+	// Set string pointer to empty to prevent further access
 	*s = ""
-	runtime.KeepAlive(b)
+	runtime.KeepAlive(s)
 }
 
 // Clear securely clears all sensitive fields in SqrlIdentity
