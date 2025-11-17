@@ -340,7 +340,7 @@ func ParseCliRequest(r *http.Request) (*CliRequest, error) {
 
 	decodedClient, err := Sqrl64.DecodeString(cli.ClientEncoded)
 	if err != nil {
-		return nil, fmt.Errorf("incalid client parameter: %v", err)
+		return nil, fmt.Errorf("invalid client parameter: %v", err)
 	}
 	defer ClearBytes(decodedClient) // Securely clear decoded client data
 
