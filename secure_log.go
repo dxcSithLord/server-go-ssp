@@ -72,23 +72,33 @@ func SafeLogAuth(event string, idk string, success bool) {
 		success)
 }
 
-// truncateKey safely truncates a key for logging purposes and sanitizes control characters
-// truncateKey returns a sanitized, log-safe representation of key truncated to at most maxLen characters.
-// If key is empty it returns "(empty)". Control characters are replaced with spaces to prevent log injection,
-// and the resulting string is cut to maxLen when longer than that.
+// truncateKey safely truncates a key for logging purposes and fully removes newline, carriage return, and other control characters.
+// It truncates key to at most maxLen characters, then removes any log injection risks by deleting all \n, \r, NUL, and other ASCII controls.
+// If key is empty it returns "(empty)". This function is robust for plain text log output.
 func truncateKey(key string, maxLen int) string {
 	if key == "" {
 		return "(empty)"
 	}
 
-	// Sanitize control characters first to prevent log injection
-	sanitized := sanitizeControlChars(key)
-
-	// Always truncate to maxLen
-	if len(sanitized) > maxLen {
-		return sanitized[:maxLen]
+	// Truncate to maxLen first
+	if len(key) > maxLen {
+		key = key[:maxLen]
 	}
-	return sanitized
+	// Remove all dangerous control characters, not just replace with spaces
+	var b strings.Builder
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		// Remove \n, \r, NUL, ESC, TAB, DEL, any ASCII <32, 127
+		if c == '\n' || c == '\r' || c == '\t' || c == 0x1b || c == 0x00 || c < 32 || c == 127 {
+			continue
+		}
+		b.WriteByte(c)
+	}
+	safe := b.String()
+	if safe == "" {
+		return "(empty)"
+	}
+	return safe
 }
 
 // sanitizeControlChars replaces control characters with safe visible tokens
