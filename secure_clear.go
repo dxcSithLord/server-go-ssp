@@ -5,7 +5,9 @@ import (
 )
 
 // ClearBytes securely clears a byte slice by overwriting with zeros.
-// Uses runtime.KeepAlive to prevent compiler optimization from removing the clear operation.
+// ClearBytes overwrites every element of b with zero.
+// If b is empty, ClearBytes does nothing.
+// It calls runtime.KeepAlive(b) to prevent the compiler from eliding the overwrite.
 func ClearBytes(b []byte) {
 	if len(b) == 0 {
 		return
@@ -18,7 +20,8 @@ func ClearBytes(b []byte) {
 }
 
 // ClearString securely clears a string's underlying data.
-// Note: Go strings are immutable, so we work on the bytes and set the string to empty.
+// ClearString clears the contents of s by overwriting its underlying bytes and setting it to the empty string.
+// If s is nil or already empty, ClearString does nothing.
 func ClearString(s *string) {
 	if s == nil || *s == "" {
 		return
@@ -96,7 +99,8 @@ func (hc *HoardCache) Clear() {
 }
 
 // ClearBytesSecure provides an additional layer of clearing with multiple passes.
-// This uses safe Go operations without unsafe pointers.
+// ClearBytesSecure overwrites the provided byte slice three times (zero, 0xFF, zero) to reduce the risk that compiler optimizations leave sensitive data in memory.
+// If the slice is empty the function returns immediately. It uses only safe Go operations (no unsafe pointers) and calls runtime.KeepAlive to ensure the slice is retained until the clears complete.
 func ClearBytesSecure(b []byte) {
 	if len(b) == 0 {
 		return
