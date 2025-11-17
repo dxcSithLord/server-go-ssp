@@ -108,7 +108,7 @@ golang.org/x/text v0.31.0
 
 #### CWE-226: Sensitive Information in Resource Not Removed Before Reuse
 
-**Severity: HIGH**
+##### Severity: HIGH
 
 | File | Line | Issue | Sensitive Data |
 |------|------|-------|----------------|
@@ -124,7 +124,7 @@ golang.org/x/text v0.31.0
 
 #### CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
 
-**Severity: HIGH**
+##### Severity: HIGH
 
 | File | Line | Issue | Data Exposed |
 |------|------|-------|--------------|
