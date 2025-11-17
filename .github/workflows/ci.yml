@@ -29,9 +29,29 @@ jobs:
           cache: true
 
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
+        # SECURITY: Using pinned version tag instead of floating @master ref
+        # For maximum security, verify the commit SHA for this tag at:
+        # https://github.com/securego/gosec/releases/tag/v2.22.0
+        # and replace with: securego/gosec@<FULL_COMMIT_SHA>
+        uses: securego/gosec@v2.22.0
         with:
           args: '-no-fail -fmt sarif -out results.sarif ./...'
+
+      - name: Check for High/Critical severity findings
+        run: |
+          # Parse SARIF for High/Critical findings
+          if [ -f results.sarif ]; then
+            # Extract severity levels from SARIF file
+            HIGH_COUNT=$(jq '[.runs[].results[] | select(.level == "error" or .level == "warning")] | length' results.sarif 2>/dev/null || echo "0")
+            if [ "$HIGH_COUNT" -gt 0 ]; then
+              echo "::error::Found $HIGH_COUNT High/Critical security findings"
+              jq -r '.runs[].results[] | select(.level == "error" or .level == "warning") | "[\(.level)] \(.ruleId): \(.message.text) at \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine)"' results.sarif 2>/dev/null || true
+              exit 1
+            fi
+            echo "No High/Critical severity findings detected"
+          else
+            echo "::warning::SARIF file not found, skipping severity check"
+          fi
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
