@@ -2,7 +2,6 @@ package ssp
 
 import (
 	"runtime"
-	"unsafe"
 )
 
 // ClearBytes securely clears a byte slice by overwriting with zeros.
@@ -96,22 +95,24 @@ func (hc *HoardCache) Clear() {
 	hc.PagNut = ""
 }
 
-// memclr is a more aggressive memory clearing function that uses unsafe operations
-// to ensure the memory is actually cleared and not optimized away.
-func memclr(b []byte) {
+// ClearBytesSecure provides an additional layer of clearing with multiple passes.
+// This uses safe Go operations without unsafe pointers.
+func ClearBytesSecure(b []byte) {
 	if len(b) == 0 {
 		return
 	}
-	// Use a volatile-like pattern to prevent optimization
-	ptr := unsafe.Pointer(&b[0])
-	for i := 0; i < len(b); i++ {
-		*(*byte)(unsafe.Add(ptr, i)) = 0
+	// First pass: zero out
+	for i := range b {
+		b[i] = 0
 	}
-	// Keep the original slice alive to ensure backing array remains valid
+	// Second pass: pattern fill (prevents optimization)
+	for i := range b {
+		b[i] = 0xFF
+	}
+	// Third pass: final zero
+	for i := range b {
+		b[i] = 0
+	}
+	// Memory fence to prevent compiler optimization
 	runtime.KeepAlive(b)
-}
-
-// ClearBytesSecure uses the more aggressive clearing method
-func ClearBytesSecure(b []byte) {
-	memclr(b)
 }
