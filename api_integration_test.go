@@ -1,4 +1,4 @@
-package ssp_test
+package ssp
 
 import (
 	"bytes"
@@ -11,36 +11,36 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/dxcSithLord/server-go-ssp"
 )
 
 // TestSuiteSetup creates a test server with all required components
-func setupTestServer(t *testing.T) (*httptest.Server, *ssp.SqrlSspAPI) {
+func setupTestServer(t *testing.T) (*httptest.Server, *SqrlSspAPI) {
 	// Create tree for nut generation
-	tree := ssp.NewRandomTree()
+	tree, err := NewRandomTree(8)
+	if err != nil {
+		t.Fatalf("Failed to create RandomTree: %v", err)
+	}
 
 	// Create in-memory storage
-	hoard := ssp.NewMapHoard()
-	authStore := ssp.NewMapAuthStore()
+	hoard := NewMapHoard()
+	authStore := NewMapAuthStore()
 
 	// Create mock authenticator
 	authenticator := &MockAuthenticator{}
 
 	// Create API instance
-	api := &ssp.SqrlSspAPI{
-		Tree:          tree,
-		Hoard:         hoard,
-		AuthStore:     authStore,
+	api := &SqrlSspAPI{
+		tree:          tree,
+		hoard:         hoard,
+		authStore:     authStore,
 		Authenticator: authenticator,
 		NutExpiration: 5 * time.Minute,
-		PagExpiration: 5 * time.Minute,
 	}
 
 	// Create test server
 	mux := http.NewServeMux()
 	mux.HandleFunc("/nut.sqrl", api.Nut)
-	mux.HandleFunc("/png.sqrl", api.Png)
+	mux.HandleFunc("/png.sqrl", api.PNG)
 	mux.HandleFunc("/cli.sqrl", api.Cli)
 	mux.HandleFunc("/pag.sqrl", api.Pag)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -55,13 +55,13 @@ func setupTestServer(t *testing.T) (*httptest.Server, *ssp.SqrlSspAPI) {
 
 // MockAuthenticator implements the Authenticator interface for testing
 type MockAuthenticator struct {
-	AuthenticateFunc func(identity *ssp.SqrlIdentity) string
-	SwapFunc         func(prev, new *ssp.SqrlIdentity) error
-	RemoveFunc       func(identity *ssp.SqrlIdentity) error
-	AskFunc          func(identity *ssp.SqrlIdentity) *ssp.Ask
+	AuthenticateFunc func(identity *SqrlIdentity) string
+	SwapFunc         func(prev, new *SqrlIdentity) error
+	RemoveFunc       func(identity *SqrlIdentity) error
+	AskFunc          func(identity *SqrlIdentity) *Ask
 }
 
-func (m *MockAuthenticator) AuthenticateIdentity(identity *ssp.SqrlIdentity) string {
+func (m *MockAuthenticator) AuthenticateIdentity(identity *SqrlIdentity) string {
 	if m.AuthenticateFunc != nil {
 		return m.AuthenticateFunc(identity)
 	}
@@ -69,21 +69,21 @@ func (m *MockAuthenticator) AuthenticateIdentity(identity *ssp.SqrlIdentity) str
 	return "https://example.com/dashboard"
 }
 
-func (m *MockAuthenticator) SwapIdentities(prev, new *ssp.SqrlIdentity) error {
+func (m *MockAuthenticator) SwapIdentities(prev, new *SqrlIdentity) error {
 	if m.SwapFunc != nil {
 		return m.SwapFunc(prev, new)
 	}
 	return nil
 }
 
-func (m *MockAuthenticator) RemoveIdentity(identity *ssp.SqrlIdentity) error {
+func (m *MockAuthenticator) RemoveIdentity(identity *SqrlIdentity) error {
 	if m.RemoveFunc != nil {
 		return m.RemoveFunc(identity)
 	}
 	return nil
 }
 
-func (m *MockAuthenticator) AskResponse(identity *ssp.SqrlIdentity) *ssp.Ask {
+func (m *MockAuthenticator) AskResponse(identity *SqrlIdentity) *Ask {
 	if m.AskFunc != nil {
 		return m.AskFunc(identity)
 	}
@@ -572,13 +572,13 @@ func TestFullAuthenticationFlow(t *testing.T) {
 	t.Log("  → Browser redirects user to application")
 
 	// Verify server components are properly initialized
-	if api.Tree == nil {
+	if api.tree == nil {
 		t.Error("Tree not initialized")
 	}
-	if api.Hoard == nil {
+	if api.hoard == nil {
 		t.Error("Hoard not initialized")
 	}
-	if api.AuthStore == nil {
+	if api.authStore == nil {
 		t.Error("AuthStore not initialized")
 	}
 	if api.Authenticator == nil {
