@@ -1,0 +1,621 @@
+openapi: 3.1.0
+info:
+  title: SQRL SSP (Server-Side Protocol) API
+  version: 2.0.0
+  description: |
+    **SQRL (Secure QR Login) Server-Side Protocol Implementation**
+
+    This API implements the SQRL authentication protocol for passwordless, cryptographic authentication using ED25519 signatures. The protocol allows users to authenticate using their SQRL client application without traditional usernames and passwords.
+
+    ## Key Features
+    - **Cryptographic Authentication:** ED25519 signature verification
+    - **Passwordless:** No passwords stored or transmitted
+    - **QR Code Support:** Easy mobile authentication
+    - **Identity Management:** Create, disable, enable, and remove identities
+    - **Key Rotation:** Support for identity key updates
+    - **Horizontal Scaling:** Compatible with distributed deployments
+
+    ## Authentication Flow
+    1. Client requests a nut (nonce) via `/nut.sqrl`
+    2. Server generates QR code via `/png.sqrl`
+    3. User scans QR code with SQRL client
+    4. SQRL client sends signed request to `/cli.sqrl`
+    5. Server verifies signature and authenticates user
+    6. Client polls `/pag.sqrl` for authentication result
+
+    ## Security Model
+    - **Nonce Expiration:** Nuts expire after configured time (default: 5 minutes)
+    - **IP Binding:** Nuts tied to original requestor IP
+    - **Signature Verification:** ED25519 cryptographic signatures
+    - **Secure Memory:** Sensitive data cleared from memory
+    - **Safe Logging:** No sensitive data exposed in logs
+
+    ## Reference
+    - SQRL Specification: https://www.grc.com/sqrl/sqrl.htm
+    - SSP API Spec: https://www.grc.com/sqrl/sspapi.htm
+
+  contact:
+    name: SQRL SSP Development Team
+    url: https://github.com/dxcSithLord/server-go-ssp
+
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://example.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: Nonce Management
+    description: Generate and manage authentication nonces (nuts)
+  - name: QR Code
+    description: QR code generation for SQRL authentication
+  - name: Client Authentication
+    description: SQRL client communication endpoint
+  - name: Polling
+    description: Poll for authentication status
+  - name: Demo
+    description: Demo web interface
+
+paths:
+  /nut.sqrl:
+    get:
+      summary: Generate Authentication Nonce
+      description: |
+        Generate a new cryptographic nonce (nut) for SQRL authentication.
+        Returns the nut, pag (page polling token), and expiration time.
+
+        **Security Note:** The pag value must be kept secret by the user-agent and used for polling.
+
+        **Extensions:** This implementation adds `pag` and `exp` parameters beyond the GRC spec for enhanced security and usability.
+
+      operationId: generateNut
+      tags:
+        - Nonce Management
+
+      parameters:
+        - name: Accept
+          in: header
+          description: Response format (application/x-www-form-urlencoded or application/json)
+          required: false
+          schema:
+            type: string
+            enum:
+              - application/x-www-form-urlencoded
+              - application/json
+            default: application/x-www-form-urlencoded
+
+      responses:
+        '200':
+          description: Nut generated successfully
+          content:
+            application/x-www-form-urlencoded:
+              schema:
+                type: string
+                example: "nut=abc123def456&pag=xyz789uvw012&exp=300"
+              examples:
+                formEncoded:
+                  summary: Form-encoded response (default)
+                  value: "nut=abc123def456&pag=xyz789uvw012&exp=300"
+
+            application/json:
+              schema:
+                type: object
+                required:
+                  - nut
+                  - pag
+                  - exp
+                properties:
+                  nut:
+                    type: string
+                    description: Cryptographic nonce (22 characters, base64url encoded)
+                    example: "abc123def456ghi789jkl0"
+                  pag:
+                    type: string
+                    description: Polling token for /pag.sqrl (must be kept secret)
+                    example: "xyz789uvw012rst345mno6"
+                  exp:
+                    type: integer
+                    description: Expiration time in seconds
+                    example: 300
+              examples:
+                jsonResponse:
+                  summary: JSON response (with Accept: application/json)
+                  value:
+                    nut: "abc123def456ghi789jkl0"
+                    pag: "xyz789uvw012rst345mno6"
+                    exp: 300
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /png.sqrl:
+    get:
+      summary: Generate QR Code
+      description: |
+        Generate a QR code for SQRL authentication. Can optionally accept an existing nut parameter, or generate a new one automatically.
+
+        **Extension:** When called without parameters, generates a new nut and includes nut/pag/exp in response headers for one-step QR code generation.
+
+      operationId: generateQRCode
+      tags:
+        - QR Code
+
+      parameters:
+        - name: nut
+          in: query
+          description: Existing nut from /nut.sqrl (optional - will generate new if omitted)
+          required: false
+          schema:
+            type: string
+            example: "abc123def456ghi789jkl0"
+
+      responses:
+        '200':
+          description: QR code generated successfully
+          headers:
+            Sqrl-Nut:
+              description: Generated nut value (only present if nut parameter not provided)
+              schema:
+                type: string
+                example: "abc123def456ghi789jkl0"
+            Sqrl-Pag:
+              description: Generated pag value (only present if nut parameter not provided)
+              schema:
+                type: string
+                example: "xyz789uvw012rst345mno6"
+            Sqrl-Exp:
+              description: Expiration in seconds (only present if nut parameter not provided)
+              schema:
+                type: integer
+                example: 300
+
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+                description: PNG image containing SQRL QR code
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /cli.sqrl:
+    post:
+      summary: SQRL Client Communication Endpoint
+      description: |
+        Main endpoint for SQRL client cryptographic authentication. Handles all SQRL commands including identity creation, authentication, key rotation, and identity management.
+
+        **Commands Supported:**
+        - `query` - Check if identity exists and account status
+        - `ident` - Authenticate with identity or create new identity
+        - `enable` - Re-enable a disabled account (requires URS signature)
+        - `disable` - Disable account to prevent unauthorized use
+        - `remove` - Remove identity from account (requires URS signature)
+
+        **Signature Verification:**
+        - `ids` - Identity signature (always required)
+        - `pids` - Previous identity signature (for key rotation)
+        - `urs` - Unlock request signature (for enable/remove)
+
+      operationId: clientAuthenticate
+      tags:
+        - Client Authentication
+
+      parameters:
+        - name: nut
+          in: query
+          description: Nut value from /nut.sqrl or previous server response
+          required: true
+          schema:
+            type: string
+            example: "abc123def456ghi789jkl0"
+
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - client
+                - server
+                - ids
+              properties:
+                client:
+                  type: string
+                  description: Base64url encoded client data (contains command, version, identity keys)
+                  example: "dmVyPTENCmNtZD1pZGVudA0KaWRrPXRoaXNpc2FmYWtlcHVibGlja2V5"
+                server:
+                  type: string
+                  description: Base64url encoded server data (echoed from previous response or initial URL)
+                  example: "c3FybDovL2V4YW1wbGUuY29tL2NsaS5zcXJsP251dD1hYmMxMjM="
+                ids:
+                  type: string
+                  description: Base64url encoded signature of client+server by identity key
+                  example: "dGhpc2lzYWZha2VzaWduYXR1cmVmb3JleGFtcGxlcHVycG9zZXM="
+                pids:
+                  type: string
+                  description: Base64url encoded signature by previous identity key (for key rotation)
+                  required: false
+                  example: "cHJldmlvdXNpZGVudGl0eXNpZ25hdHVyZWhlcmU="
+                urs:
+                  type: string
+                  description: Base64url encoded unlock request signature (for enable/remove)
+                  required: false
+                  example: "dW5sb2NrcmVxdWVzdHNpZ25hdHVyZWhlcmU="
+
+            examples:
+              queryCommand:
+                summary: Query command (check identity status)
+                value: |
+                  client=dmVyPTENCmNtZD1xdWVyeQ0KaWRrPWFiY2RlZg==&server=c3FybDovL2V4YW1wbGUuY29tL2NsaS5zcXJsP251dD1hYmMxMjM=&ids=c2lnbmF0dXJlaGVyZQ==
+
+              identCommand:
+                summary: Ident command (authenticate or create)
+                value: |
+                  client=dmVyPTENCmNtZD1pZGVudA0KaWRrPWFiY2RlZg0Kc3VrPXN1a2tleQ0Kdnv rPXZ1a2tleQ==&server=c3FybDovL2V4YW1wbGUuY29tL2NsaS5zcXJsP251dD1hYmMxMjM=&ids=c2lnbmF0dXJlaGVyZQ==
+
+              disableCommand:
+                summary: Disable command (lock account)
+                value: |
+                  client=dmVyPTENCmNtZD1kaXNhYmxl&server=c3FybDovL2V4YW1wbGUuY29tL2NsaS5zcXJsP251dD1hYmMxMjM=&ids=c2lnbmF0dXJlaGVyZQ==
+
+              enableCommand:
+                summary: Enable command (unlock account with URS)
+                value: |
+                  client=dmVyPTENCmNtZD1lbmFibGU=&server=c3FybDovL2V4YW1wbGUuY29tL2NsaS5zcXJsP251dD1hYmMxMjM=&ids=c2lnbmF0dXJlaGVyZQ==&urs=dW5sb2Nrc2lnbmF0dXJl
+
+      responses:
+        '200':
+          description: Request processed successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: Base64url encoded server response
+                example: "dmVyPTENCnRpZj0xDQpxcnk9L3BuZy5zcXJsP251dD14eXo3ODkNCnNmbj1FeGFtcGxlIFNlcnZpY2U="
+
+              examples:
+                queryResponse:
+                  summary: Query response (identity exists)
+                  value: "dmVyPTENCnRpZj00DQpxcnk9L3BuZy5zcXJsP251dD14eXo3ODkNCg=="
+                  description: |
+                    Decoded:
+                    ver=1
+                    tif=4 (0x04 = ID_MATCH)
+                    qry=/png.sqrl?nut=xyz789
+
+                identSuccessResponse:
+                  summary: Ident response (authentication successful)
+                  value: "dmVyPTENCnRpZj01DQpxcnk9L3BuZy5zcXJsP251dD14eXo3ODkNCnVybD1odHRwczovL2V4YW1wbGUuY29tL2Rhc2hib2FyZA=="
+                  description: |
+                    Decoded:
+                    ver=1
+                    tif=5 (0x01 = ID_MATCH, 0x04 = CURRENT_ID_MATCH)
+                    qry=/png.sqrl?nut=xyz789
+                    url=https://example.com/dashboard
+
+                identCreateResponse:
+                  summary: Ident response (new identity created)
+                  value: "dmVyPTENCnRpZj0xDQpxcnk9L3BuZy5zcXJsP251dD14eXo3ODkNCnVybD1odHRwczovL2V4YW1wbGUuY29tL3dlbGNvbWU="
+                  description: |
+                    Decoded:
+                    ver=1
+                    tif=1 (0x01 = ID_MATCH - newly created)
+                    qry=/png.sqrl?nut=xyz789
+                    url=https://example.com/welcome
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /pag.sqrl:
+    get:
+      summary: Poll for Authentication Status
+      description: |
+        Poll for authentication status after /cli.sqrl interaction. Returns redirect URL when authentication is successful.
+
+        **Security:** Requires both `nut` and `pag` parameters. The pag value ties the polling request to the original nut requestor.
+
+        **Extension:** Supports JSON response format in addition to GRC spec's URL string.
+
+      operationId: pollAuthentication
+      tags:
+        - Polling
+
+      parameters:
+        - name: nut
+          in: query
+          description: Nut value from /nut.sqrl
+          required: true
+          schema:
+            type: string
+            example: "abc123def456ghi789jkl0"
+
+        - name: pag
+          in: query
+          description: Pag (polling token) from /nut.sqrl
+          required: true
+          schema:
+            type: string
+            example: "xyz789uvw012rst345mno6"
+
+        - name: Accept
+          in: header
+          description: Response format (text/plain or application/json)
+          required: false
+          schema:
+            type: string
+            enum:
+              - text/plain
+              - application/json
+            default: text/plain
+
+      responses:
+        '200':
+          description: Polling successful (may indicate auth pending or completed)
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: Redirect URL (empty if authentication still pending)
+                example: "https://example.com/dashboard"
+
+              examples:
+                pending:
+                  summary: Authentication pending
+                  value: ""
+
+                authenticated:
+                  summary: Authentication successful
+                  value: "https://example.com/dashboard"
+
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    description: Redirect URL (empty if authentication still pending)
+                    example: "https://example.com/dashboard"
+
+              examples:
+                pending:
+                  summary: Authentication pending
+                  value:
+                    url: ""
+
+                authenticated:
+                  summary: Authentication successful
+                  value:
+                    url: "https://example.com/dashboard"
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /:
+    get:
+      summary: Demo Homepage
+      description: Serves demo web interface for testing SQRL authentication
+      operationId: homepage
+      tags:
+        - Demo
+
+      responses:
+        '200':
+          description: HTML page with QR code and login interface
+          content:
+            text/html:
+              schema:
+                type: string
+                example: "<!DOCTYPE html><html>...</html>"
+
+components:
+  schemas:
+    ClientBody:
+      type: object
+      description: Decoded client data from SQRL client
+      required:
+        - ver
+        - cmd
+        - idk
+      properties:
+        ver:
+          type: integer
+          description: SQRL protocol version (currently 1)
+          example: 1
+        cmd:
+          type: string
+          description: SQRL command
+          enum:
+            - query
+            - ident
+            - disable
+            - enable
+            - remove
+          example: "ident"
+        idk:
+          type: string
+          description: Identity public key (ED25519, base64url encoded)
+          example: "abcdefghijklmnopqrstuvwxyz0123456789ABCDEF"
+        pidk:
+          type: string
+          description: Previous identity public key (for key rotation)
+          example: "PREVIOUSKEY123456789"
+        suk:
+          type: string
+          description: Server unlock key (base64url encoded)
+          example: "SERVERUNLOCKKEY123"
+        vuk:
+          type: string
+          description: Verify unlock key (base64url encoded)
+          example: "VERIFYUNLOCKKEY456"
+        opt:
+          type: array
+          items:
+            type: string
+          description: Client options
+          example: ["sqrlonly", "hardlock"]
+
+    ServerResponse:
+      type: object
+      description: Decoded server response to SQRL client
+      required:
+        - ver
+        - tif
+        - qry
+      properties:
+        ver:
+          type: integer
+          description: SQRL protocol version
+          example: 1
+        tif:
+          type: integer
+          description: |
+            Transaction Information Flags (hex bitmask):
+            - 0x01: ID_MATCH - Identity matches
+            - 0x02: PREVIOUS_ID_MATCH - Previous identity matches
+            - 0x04: IP_MATCH - IP address matches
+            - 0x08: SQRL_DISABLED - SQRL authentication disabled
+            - 0x10: FUNCTION_NOT_SUPPORTED - Function not supported
+            - 0x20: TRANSIENT_ERROR - Temporary error
+            - 0x40: COMMAND_FAILED - Command failed
+            - 0x80: CLIENT_FAILURE - Client sent bad data
+            - 0x100: BAD_ID_ASSOCIATION - Identity association failed
+            - 0x200: INVALID_LINK_ORIGIN - Request from unexpected origin
+          example: 5
+          format: hex
+        nut:
+          type: string
+          description: New nut for next request
+          example: "newnut789xyz012abc"
+        qry:
+          type: string
+          description: Query path for next QR code
+          example: "/png.sqrl?nut=newnut789xyz012abc"
+        url:
+          type: string
+          description: Success redirect URL (when authenticated)
+          example: "https://example.com/dashboard"
+        ask:
+          type: string
+          description: Message to display to user
+          example: "Do you want to create a new account?"
+        sin:
+          type: integer
+          description: Server information (reserved for future use)
+          example: 0
+
+    SqrlIdentity:
+      type: object
+      description: SQRL identity stored by the server
+      required:
+        - idk
+      properties:
+        idk:
+          type: string
+          description: Identity public key (ED25519, base64url encoded)
+          example: "abcdefghijklmnopqrstuvwxyz0123456789ABCDEF"
+        suk:
+          type: string
+          description: Server unlock key
+          example: "SERVERUNLOCKKEY123"
+        vuk:
+          type: string
+          description: Verify unlock key
+          example: "VERIFYUNLOCKKEY456"
+        pidk:
+          type: string
+          description: Previous identity key (for key rotation tracking)
+          example: "PREVIOUSKEY123456789"
+        sqrlOnly:
+          type: boolean
+          description: Account requires SQRL-only authentication
+          example: false
+        hardlock:
+          type: boolean
+          description: Account requires full unlock process
+          example: false
+        disabled:
+          type: boolean
+          description: Account is disabled
+          example: false
+        rekeyed:
+          type: string
+          description: New identity key if account was rekeyed
+          example: ""
+        btn:
+          type: integer
+          description: User's button response to Ask message (-1 if none)
+          example: -1
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request"
+        details:
+          type: string
+          description: Detailed error information
+          example: "Missing required parameter: nut"
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid parameters or malformed data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Bad Request"
+            details: "Invalid nut parameter"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Not Found"
+            details: "Nut not found or expired"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal Server Error"
+            details: "Failed to generate QR code"
+
+  securitySchemes:
+    SQRLSignature:
+      type: http
+      scheme: bearer
+      description: |
+        SQRL uses cryptographic signatures instead of bearer tokens.
+        The `ids`, `pids`, and `urs` parameters in the /cli.sqrl request contain ED25519 signatures that authenticate the request.
+
+security: []
+
+externalDocs:
+  description: SQRL Specification and Documentation
+  url: https://www.grc.com/sqrl/sqrl.htm
