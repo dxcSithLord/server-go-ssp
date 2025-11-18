@@ -1,0 +1,262 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Run security scan weekly
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: read
+
+jobs:
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Run Gosec Security Scanner
+        # SECURITY: Pinned to specific commit SHA for v2.22.10 (immutable)
+        # v2.22.10 supports Go 1.25.3/1.24.9, released Oct 15, 2025
+        # Checksum verification: https://github.com/securego/gosec/releases/download/v2.22.10/gosec_2.22.10_checksums.txt
+        # GPG signature: https://github.com/securego/gosec/releases/download/v2.22.10/gosec_2.22.10_checksums.txt.gpg
+        uses: securego/gosec@6be2b51fd78feca86af91f5186b7964d76cb1256 # v2.22.10
+        with:
+          args: '-no-fail -fmt sarif -out results.sarif ./...'
+
+      - name: Check for High/Critical severity findings
+        run: |
+          # Parse SARIF for High/Critical findings
+          if [ -f results.sarif ]; then
+            # Extract severity levels from SARIF file
+            HIGH_COUNT=$(jq '[.runs[].results[] | select(.level == "error" or .level == "warning")] | length' results.sarif 2>/dev/null || echo "0")
+            if [ "$HIGH_COUNT" -gt 0 ]; then
+              echo "::error::Found $HIGH_COUNT High/Critical security findings"
+              jq -r '.runs[].results[] | select(.level == "error" or .level == "warning") | "[\(.level)] \(.ruleId): \(.message.text) at \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine)"' results.sarif 2>/dev/null || true
+              exit 1
+            fi
+            echo "No High/Critical severity findings detected"
+          else
+            echo "::warning::SARIF file not found, skipping severity check"
+          fi
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: results.sarif
+
+  lint:
+    name: Lint and Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          # Install from source to ensure it's built with Go 1.25
+          # This avoids the "Go version used to build golangci-lint is lower than targeted" error
+          install-mode: goinstall
+          args: --timeout=5m
+
+      - name: Check for formatting issues
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Go files must be formatted with gofmt. Please run:"
+            echo "  gofmt -w ."
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ['1.25']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Get dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Run tests with race detector
+        run: go test -race -coverprofile=coverage.out -covermode=atomic -v ./...
+
+      - name: Generate coverage report
+        run: go tool cover -func=coverage.out
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Total Coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 50" | bc -l) )); then
+            echo "::warning::Coverage ${COVERAGE}% is below 50% threshold"
+          fi
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "::error::ENFORCING 80% COVERAGE GATE: Coverage ${COVERAGE}% is below minimum required threshold of 80%"
+            echo "CI job failed: Test coverage must be at least 80% as specified in SECURITY_REVIEW.md"
+            exit 1
+          fi
+          echo "Coverage ${COVERAGE}% meets or exceeds 80% minimum threshold"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.go-version == '1.25'
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  build:
+    name: Build
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Build library
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -v ./...
+
+      - name: Build server binary
+        if: matrix.goos != 'darwin' || matrix.goarch != 'arm64'
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          cd server
+          go build -o ../sqrl-server-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} .
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        with:
+          name: sqrl-server-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: sqrl-server-*
+          retention-days: 7
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0, AGPL-3.0
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: go
+          queries: +security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:go"
+
+  vulnerability-scan:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        run: govulncheck ./...
+
+  benchmark:
+    name: Benchmark Tests
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Run benchmarks
+        run: go test -bench=. -benchmem -run=^$ ./...

@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
-	ssp "github.com/sqrldev/server-go-ssp"
-	"github.com/sqrldev/server-go-ssp/server/homepagehandler"
+	ssp "github.com/dxcSithLord/server-go-ssp"
+	"github.com/dxcSithLord/server-go-ssp/server/homepagehandler"
 )
 
 var certFile, keyFile string
@@ -54,7 +55,9 @@ func main() {
 		Vuk:      "GdEBlxqMeZeHhjmEnWInBQTs0zcO6wkqc23o2oATfiw",
 		Pidk:     "",
 	}
-	authStore.SaveIdentity(idSeed)
+	if err := authStore.SaveIdentity(idSeed); err != nil {
+		log.Printf("Failed to save initial identity: %v", err)
+	}
 
 	hph := &homepagehandler.TemplatedAssets{
 		API: sspAPI,
@@ -67,12 +70,25 @@ func main() {
 	http.HandleFunc("/", hph.Handle)
 
 	listenOn := fmt.Sprintf(":%d", port)
+
+	// Create server with security timeouts to prevent slowloris and resource exhaustion attacks
+	// ReadTimeout: Maximum duration for reading the entire request (headers + body)
+	// WriteTimeout: Maximum duration before timing out writes of the response
+	// IdleTimeout: Maximum duration to wait for the next request when keep-alives are enabled
+	server := &http.Server{
+		Addr:         listenOn,
+		Handler:      nil, // Use DefaultServeMux
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
 	if certFile != "" && keyFile != "" {
 		log.Printf("Listening TLS on port %d", port)
-		err = http.ListenAndServeTLS(listenOn, certFile, keyFile, nil)
+		err = server.ListenAndServeTLS(certFile, keyFile)
 	} else {
 		log.Printf("Listening on port %d", port)
-		err = http.ListenAndServe(listenOn, nil)
+		err = server.ListenAndServe()
 	}
 	if err != nil {
 		log.Printf("Failed server start: %v", err)

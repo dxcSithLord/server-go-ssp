@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// Ensure log is used (for future debugging if needed)
+var _ = log.Printf
+
 //
 
 // TIF bitflags
@@ -130,10 +133,6 @@ func encodeButton(button, url string) string {
 		return Sqrl64.EncodeToString([]byte(fmt.Sprintf("%s%s", removeSemi(button), urlappend)))
 	}
 	return ""
-}
-
-func removeTilde(v string) string {
-	return strings.Replace(v, "~", "", -1)
 }
 
 func removeSemi(v string) string {
@@ -273,7 +272,7 @@ func (cr *CliResponse) Encode() []byte {
 	}
 
 	encoded := Sqrl64.EncodeToString(b.Bytes())
-	log.Printf("Encoded response: <%v>", encoded)
+	// SECURITY: Do not log encoded response as it may contain sensitive tokens
 	return []byte(encoded)
 }
 

@@ -35,11 +35,11 @@ func (api *SqrlSspAPI) Nut(w http.ResponseWriter, r *http.Request) {
 		}
 		enc, err := json.Marshal(respObj)
 		if err != nil {
-			log.Printf("Failed json encode: %v", err)
+			SafeLogError("json_encode_nut", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		w.Write(enc)
+		_, _ = w.Write(enc)
 		return
 	}
 	w.Header().Add("Content-Type", "application/x-www-form-urlencoded")
@@ -54,7 +54,7 @@ func (api *SqrlSspAPI) Nut(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write([]byte(values.Encode()))
 	if err != nil {
-		log.Printf("Nut response write error: %v", err)
+		SafeLogError("nut_response_write", err)
 	}
 }
 
@@ -75,11 +75,12 @@ func (api *SqrlSspAPI) createAndSaveNut(r *http.Request) (*HoardCache, error) {
 		PagNut:      pagnut,
 	}
 	// store the nut in the hoard
-	api.hoard.Save(nut, hoardCache, api.NutExpiration)
+	err = api.hoard.Save(nut, hoardCache, api.NutExpiration)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to save a nut: %v", err)
 	}
-	log.Printf("Saved nut %v in hoard from %v", nut, hoardCache.RemoteIP)
+	// SECURITY: Sanitize nut and mask IP to prevent log injection
+	SafeLogInfo("Saved nut %s in hoard from %s", sanitizeForLog(string(nut)), maskIP(hoardCache.RemoteIP))
 	return hoardCache, nil
 }
 
@@ -120,7 +121,7 @@ func (api *SqrlSspAPI) PNG(w http.ResponseWriter, r *http.Request) {
 	png, err := qrcode.Encode(value, qrcode.Medium, -5)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed create of PNG"))
+		_, _ = w.Write([]byte("Failed create of PNG"))
 		return
 	}
 
@@ -130,7 +131,7 @@ func (api *SqrlSspAPI) PNG(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Sqrl-Exp", fmt.Sprintf("%d", api.NutExpirationSeconds()))
 	}
 	w.Header().Add("Content-Type", "image/png")
-	w.Write(png)
+	_, _ = w.Write(png)
 }
 
 type pagJSON struct {
@@ -142,13 +143,13 @@ func (api *SqrlSspAPI) Pag(w http.ResponseWriter, r *http.Request) {
 	nut := r.URL.Query().Get("nut")
 	if nut == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Missing required nut parameter"))
+		_, _ = w.Write([]byte("Missing required nut parameter"))
 		return
 	}
 	pagnut := r.URL.Query().Get("pag")
 	if pagnut == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Missing required pag parameter"))
+		_, _ = w.Write([]byte("Missing required pag parameter"))
 		return
 	}
 
@@ -158,22 +159,22 @@ func (api *SqrlSspAPI) Pag(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		log.Printf("Failed nut lookup: %v", err)
+		SafeLogError("pag_nut_lookup", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed nut lookup"))
+		_, _ = w.Write([]byte("Failed nut lookup"))
 		return
 	}
 
 	if hoardCache.OriginalNut != Nut(nut) {
-		log.Printf("Got query for pagnut but original nut doesn't match")
+		log.Print("Got query for pagnut but original nut doesn't match")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	if hoardCache.Identity == nil {
-		log.Printf("Nil identity on pag hoardCache")
+		log.Print("Nil identity on pag hoardCache")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Missing identity"))
+		_, _ = w.Write([]byte("Missing identity"))
 		return
 	}
 
@@ -184,13 +185,13 @@ func (api *SqrlSspAPI) Pag(w http.ResponseWriter, r *http.Request) {
 		}
 		enc, err := json.Marshal(respObj)
 		if err != nil {
-			log.Printf("Failed json encode: %v", err)
+			SafeLogError("json_encode_pag", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		w.Write(enc)
+		_, _ = w.Write(enc)
 		return
 	}
 
-	w.Write([]byte(api.Authenticator.AuthenticateIdentity(hoardCache.Identity)))
+	_, _ = w.Write([]byte(api.Authenticator.AuthenticateIdentity(hoardCache.Identity)))
 }

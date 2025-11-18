@@ -5,7 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -110,7 +110,7 @@ func (cb *ClientBody) Encode() []byte {
 	}
 
 	encoded := Sqrl64.EncodeToString(b.Bytes())
-	log.Printf("Encoded response: <%v>", encoded)
+	// SECURITY: Do not log encoded payload as it contains sensitive identity material (idk, suk, vuk, pidk)
 	return []byte(encoded)
 
 }
@@ -225,10 +225,14 @@ func (cr *CliRequest) VerifySignature() error {
 	if err != nil {
 		return err
 	}
+	defer ClearBytes(pubKey) // Securely clear public key after use
+
 	decodedIds, err := Sqrl64.DecodeString(cr.Ids)
 	if err != nil {
 		return fmt.Errorf("invalid ids: %v", err)
 	}
+	defer ClearBytes(decodedIds) // Securely clear signature after use
+
 	if !ed25519.Verify(pubKey, cr.SigningString(), decodedIds) {
 		return fmt.Errorf("signature verification failed")
 	}
@@ -246,10 +250,14 @@ func (cr *CliRequest) VerifyPidsSignature() error {
 	if err != nil {
 		return err
 	}
+	defer ClearBytes(pubKey) // Securely clear public key after use
+
 	decodedPids, err := Sqrl64.DecodeString(cr.Pids)
 	if err != nil {
 		return fmt.Errorf("invalid pids: %v", err)
 	}
+	defer ClearBytes(decodedPids) // Securely clear signature after use
+
 	if !ed25519.Verify(pubKey, cr.SigningString(), decodedPids) {
 		return fmt.Errorf("pids signature verification failed")
 	}
@@ -267,10 +275,14 @@ func (cr *CliRequest) VerifyUrs(vuk string) error {
 	if err != nil {
 		return fmt.Errorf("invalid urs: %v", err)
 	}
+	defer ClearBytes(decodedUrs) // Securely clear signature after use
+
 	pubKey, err := base64.RawURLEncoding.DecodeString(vuk)
 	if err != nil {
 		return fmt.Errorf("can't decode vuk")
 	}
+	defer ClearBytes(pubKey) // Securely clear public key after use
+
 	if len(pubKey) != ed25519.PublicKeySize {
 		return fmt.Errorf("invalid vuk")
 	}
@@ -290,15 +302,37 @@ func (cr *CliRequest) ValidateLastResponse(lastRepsonse []byte) bool {
 
 // ParseCliRequest parses and validates the request. The CliRequest
 // can be trusted if no error is returned as the signatures have been
-// checked.
+// ParseCliRequest reads an HTTP POST for the /cli.sqrl endpoint, parses its form fields,
+// constructs a CliRequest, and verifies the client's signature.
+//
+// The request body must be application/x-www-form-urlencoded and include the `client` field
+// (Sqrl64-encoded client payload). The function decodes and parses the client payload into
+// a ClientBody, populates the returned CliRequest's Server, Ids, Pids, and Urs fields, and
+// performs cryptographic signature verification.
+//
+// Errors are returned for failures reading the request body, parsing the form, decoding or
+// parsing the client payload, constructing the ClientBody, or for signature verification
+// failures. Sensitive intermediate buffers (request body, decoded client data, and other
+// decoded cryptographic material) are securely cleared from memory before the function returns.
+//
+// NOTE: While byte buffers are cleared, Go string copies created during parsing (e.g., via
+// string(body) or url.ParseQuery) cannot be cleared as strings are immutable. These copies
+// remain in memory until garbage collection. For maximum security in production, consider
+// implementing custom parsers that work directly with []byte to avoid string allocation.
 func ParseCliRequest(r *http.Request) (*CliRequest, error) {
-	body, err := ioutil.ReadAll(r.Body)
+	// Ensure body is closed even if ReadAll fails
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed reading post body: %v", err)
 	}
-	defer r.Body.Close()
-	log.Printf("Got body: %v", string(body))
+	defer ClearBytes(body) // Securely clear request body after parsing
 
+	// SECURITY: Do not log raw request body as it contains sensitive cryptographic data
+	log.Printf("Received CLI request (body size: %d bytes)", len(body))
+
+	// NOTE: string(body) creates a copy that cannot be cleared
 	params, err := url.ParseQuery(string(body))
 	if err != nil {
 		return nil, fmt.Errorf("invalid cli.sqrl request: %v", err)
@@ -314,8 +348,10 @@ func ParseCliRequest(r *http.Request) (*CliRequest, error) {
 
 	decodedClient, err := Sqrl64.DecodeString(cli.ClientEncoded)
 	if err != nil {
-		return nil, fmt.Errorf("incalid client parameter: %v", err)
+		return nil, fmt.Errorf("invalid client parameter: %v", err)
 	}
+	defer ClearBytes(decodedClient) // Securely clear decoded client data
+
 	clientParams, err := ParseSqrlQuery(string(decodedClient))
 	if err != nil {
 		return nil, fmt.Errorf("invalid cli.sqrl client body: %v", err)

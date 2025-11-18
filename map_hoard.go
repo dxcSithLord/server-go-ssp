@@ -38,12 +38,16 @@ func (mh *MapHoard) cleaner() {
 		i := 0
 		for k, v := range mh.cache {
 			if v.Expired() {
+				// SECURITY: Securely clear sensitive data before deletion
+				if v.value != nil {
+					v.value.Clear()
+				}
 				delete(mh.cache, k)
 			}
 			i++
 			// check for going over time
 			if i%100 == 0 {
-				if time.Now().Sub(start) > 50*time.Millisecond {
+				if time.Since(start) > 50*time.Millisecond {
 					break
 				}
 			}
@@ -60,6 +64,10 @@ func (mh *MapHoard) Get(nut Nut) (*HoardCache, error) {
 		if !value.Expired() {
 			return value.value, nil
 		}
+		// SECURITY: Securely clear expired data before deletion
+		if value.value != nil {
+			value.value.Clear()
+		}
 		delete(mh.cache, nut)
 	}
 	return nil, ErrNotFound
@@ -73,6 +81,10 @@ func (mh *MapHoard) GetAndDelete(nut Nut) (*HoardCache, error) {
 		delete(mh.cache, nut)
 		if !value.Expired() {
 			return value.value, nil
+		}
+		// SECURITY: Clear expired data before returning not found
+		if value.value != nil {
+			value.value.Clear()
 		}
 	}
 	return nil, ErrNotFound

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 var supportedCommands = map[string]bool{
@@ -18,10 +16,11 @@ var supportedCommands = map[string]bool{
 
 // Cli implements the /cli.sqrl endpoint
 func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Req: %v", r.URL)
+	// SECURITY: Sanitize URL before logging to prevent log injection
+	SafeLogInfo("Req: %v", sanitizeForLog(r.URL.String()))
 	nut := Nut(r.URL.Query().Get("nut"))
 	if nut == "" {
-		w.Write(NewCliResponse("", "").WithClientFailure().Encode())
+		_, _ = w.Write(NewCliResponse("", "").WithClientFailure().Encode())
 		return
 	}
 
@@ -29,26 +28,33 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	response := NewCliResponse(Nut(nut), api.qry(nut))
 	req, err := ParseCliRequest(r)
 	if err != nil {
-		log.Printf("Can't parse body or bad signature: %v", err)
-		w.Write(response.WithClientFailure().WithCommandFailed().Encode())
+		// SECURITY: Sanitize error to prevent log injection from user input
+		SafeLogError("parse_request", err)
+		_, _ = w.Write(response.WithClientFailure().WithCommandFailed().Encode())
 		return
 	}
 	// Signature is OK from here on!
 
+	// NOTE: Do NOT call req.Clear() here - the request object is stored by reference
+	// in HoardCache.LastRequest for validation of subsequent requests. Clearing it
+	// would corrupt the cached data. Request cleanup is handled by HoardCache when
+	// entries expire or are deleted (see MapHoard.cleanup and HoardCache.Clear).
+
 	// defer writing the response and saving the new nut
 	defer api.writeResponse(req, response, w)
 
-	// TODO remove me
-	spew.Dump(req)
+	// SECURITY: Use safe logging instead of dumping full request
+	SafeLogRequest(req)
 
 	hoardCache, err := api.getAndDelete(Nut(nut))
 	if err != nil {
 		if err == ErrNotFound {
-			log.Printf("Nut %v not found", nut)
+			// SECURITY: Sanitize nut value to prevent log injection
+			SafeLogInfo("Nut %s not found", sanitizeForLog(string(nut)))
 			response.WithClientFailure().WithCommandFailed()
 			return
 		}
-		log.Printf("Failed nut lookup: %v", err)
+		SafeLogError("nut_lookup", err)
 		response.WithTransientError().WithCommandFailed()
 		return
 	}
@@ -69,7 +75,7 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	// generate new nut
 	nut, err = api.tree.Nut()
 	if err != nil {
-		log.Printf("Error generating nut: %v", err)
+		SafeLogError("nut_generation", err)
 		response.WithCommandFailed()
 		return
 	}
@@ -82,7 +88,7 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 
 	identity, err := api.authStore.FindIdentity(req.Client.Idk)
 	if err != nil && err != ErrNotFound {
-		log.Printf("Error looking up identity: %v", err)
+		SafeLogError("identity_lookup", err)
 		response.WithCommandFailed()
 		return
 	}
@@ -118,10 +124,8 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 
 func (api *SqrlSspAPI) writeResponse(req *CliRequest, response *CliResponse, w http.ResponseWriter) {
 	respBytes := response.Encode()
-	// TODO debug remove me
-	decodedResp, _ := Sqrl64.DecodeString(string(respBytes))
-	log.Printf("Response: %v", string(decodedResp))
-	log.Printf("Encoded response: %v", string(respBytes))
+	// SECURITY: Do not log full response content as it may contain sensitive data
+	SafeLogResponse(response)
 
 	// always save back the new nut
 	if response.HoardCache != nil {
@@ -134,14 +138,15 @@ func (api *SqrlSspAPI) writeResponse(req *CliRequest, response *CliResponse, w h
 			LastResponse: respBytes,
 		}, api.NutExpiration)
 		if err != nil {
-			log.Printf("Failed saving to hoard: %v", err)
+			SafeLogError("hoard_save", err)
 			response.WithCommandFailed()
 			respBytes = response.Encode()
 		} else {
-			log.Printf("Saved nut %v in hoard", response.Nut)
+			// SECURITY: Sanitize nut before logging
+			SafeLogInfo("Saved nut %s in hoard", sanitizeForLog(string(response.Nut)))
 		}
 	}
-	w.Write(respBytes)
+	_, _ = w.Write(respBytes)
 	log.Println()
 }
 
@@ -160,17 +165,30 @@ func (api *SqrlSspAPI) finishCliResponse(req *CliRequest, response *CliResponse,
 	if identity != nil {
 		accountDisabled = identity.Disabled
 	}
-	if req.IsAuthCommand() && !accountDisabled {
-		log.Printf("Authenticated Idk: %#v", identity)
-		authURL, err := api.authenticateIdentity(identity, req.Client.Btn)
-		if err != nil {
-			log.Printf("Failed saving identity: %v", err)
-			response.WithCommandFailed()
+
+	// Guard against nil identity for auth commands
+	// This can happen if FindIdentity returned ErrNotFound and command is not "ident"
+	if req.IsAuthCommand() {
+		if identity == nil {
+			// Cannot authenticate without an identity
+			SafeLogError("auth_nil_identity", fmt.Errorf("auth command with nil identity"))
+			response.WithClientFailure().WithCommandFailed()
 			return
 		}
-		if req.Client.Opt["cps"] {
-			log.Printf("Setting CPS Auth: %v", authURL)
-			response.URL = authURL
+		if !accountDisabled {
+			// SECURITY: Use safe logging for identity information
+			SafeLogAuth("authenticate", identity.Idk, true)
+			authURL, err := api.authenticateIdentity(identity, req.Client.Btn)
+			if err != nil {
+				SafeLogError("save_identity", err)
+				response.WithCommandFailed()
+				return
+			}
+			if req.Client.Opt["cps"] {
+				// SECURITY: Sanitize auth URL before logging to prevent log injection
+				SafeLogAuth("cps_auth_set", sanitizeForLog(authURL), true)
+				response.URL = authURL
+			}
 		}
 	}
 
@@ -179,7 +197,7 @@ func (api *SqrlSspAPI) finishCliResponse(req *CliRequest, response *CliResponse,
 		response.WithCommandFailed()
 	}
 
-	if req.IsAuthCommand() && !accountDisabled {
+	if req.IsAuthCommand() && identity != nil && !accountDisabled {
 		// for non-CPS we save the state back to the PagNut for redirect on polling
 		if !req.Client.Opt["cps"] {
 			err := api.hoard.Save(hoardCache.PagNut, &HoardCache{
@@ -191,10 +209,11 @@ func (api *SqrlSspAPI) finishCliResponse(req *CliRequest, response *CliResponse,
 				Identity:    identity,
 			}, api.NutExpiration)
 			if err != nil {
-				log.Printf("Failed saving to hoard: %v", err)
+				SafeLogError("hoard_save_pagnut", err)
 				response.WithCommandFailed()
 			}
-			log.Printf("Saved pagnut %v in hoard", hoardCache.PagNut)
+			// SECURITY: Sanitize pagnut before logging
+			SafeLogInfo("Saved pagnut %s in hoard", sanitizeForLog(string(hoardCache.PagNut)))
 		}
 	}
 }
@@ -203,11 +222,12 @@ func (api *SqrlSspAPI) checkPreviousSwap(previousIdentity, identity *SqrlIdentit
 	if previousIdentity != nil {
 		err := api.swapIdentities(previousIdentity, identity)
 		if err != nil {
-			log.Printf("Failed swapping identities: %v", err)
+			SafeLogError("identity_swap", err)
 			response.WithCommandFailed()
 			return fmt.Errorf("identity swap error")
 		}
-		log.Printf("Swapped identity %#v for %#v", previousIdentity, identity)
+		// SECURITY: Use safe logging without exposing full identity details
+		SafeLogAuth("identity_swap", identity.Idk, true)
 		// TODO should we clear the PreviousIDMatch here?
 		response.ClearPreviousIDMatch()
 	}
@@ -220,7 +240,7 @@ func (api *SqrlSspAPI) checkPreviousIdentity(req *CliRequest, response *CliRespo
 	if req.Client.Pidk != "" {
 		previousIdentity, err = api.authStore.FindIdentity(req.Client.Pidk)
 		if err != nil && err != ErrNotFound {
-			log.Printf("Error looking up previous identity: %v", err)
+			SafeLogError("lookup_previous_identity", err)
 			response.WithCommandFailed()
 			return nil, err
 		}
@@ -238,26 +258,28 @@ func (api *SqrlSspAPI) requestValidations(hoardCache *HoardCache, req *CliReques
 	// validate last response against this request
 	if hoardCache.LastResponse != nil && !req.ValidateLastResponse(hoardCache.LastResponse) {
 		response.WithCommandFailed()
-		// this is intentionally after so nothing about last response leaks
-		log.Printf("Last response %v and this one don't match: %v", string(hoardCache.LastResponse), string(req.Server))
+		// SECURITY: Do not log response content as it contains sensitive data
+		log.Printf("Last response validation failed")
 		return fmt.Errorf("validation error")
 	}
 
 	// validate the IP if required
 	if hoardCache.RemoteIP != req.IPAddress {
 		if !req.Client.Opt["noiptest"] {
-			log.Printf("Rejecting on IP mis-match orig: %v current: %v", hoardCache.RemoteIP, api.RemoteIP(r))
+			// SECURITY: Mask IP addresses to prevent log injection and maintain privacy
+			SafeLogInfo("Rejecting on IP mis-match orig: %s current: %s", maskIP(hoardCache.RemoteIP), maskIP(api.RemoteIP(r)))
 			response.WithCommandFailed()
 			return fmt.Errorf("validation error")
 		}
 	} else {
-		log.Printf("Matched IP addresses")
+		log.Print("Matched IP addresses")
 		response = response.WithIPMatch()
 	}
 
 	// validating the current request and associated Idk's match
 	if hoardCache.LastRequest != nil && hoardCache.LastRequest.Client.Idk != req.Client.Idk {
-		log.Printf("Identity mismatch orig: %v current %v", hoardCache.LastRequest.Client.Idk, req.Client.Idk)
+		// SECURITY: Truncate identity keys to prevent log injection
+		SafeLogInfo("Identity mismatch orig: %s... current: %s...", truncateKey(hoardCache.LastRequest.Client.Idk, 8), truncateKey(req.Client.Idk, 8))
 		response.WithCommandFailed().WithClientFailure().WithBadIDAssociation()
 		return fmt.Errorf("validation error")
 	}
@@ -273,7 +295,8 @@ func (api *SqrlSspAPI) requestValidations(hoardCache *HoardCache, req *CliReques
 func (api *SqrlSspAPI) knownIdentity(req *CliRequest, response *CliResponse, identity *SqrlIdentity) error {
 	if identity.Rekeyed != "" {
 		response.WithIdentitySuperseded()
-		log.Printf("Attempt to use Rekeyed IDK: %v from %v", identity.Idk, req.IPAddress)
+		// SECURITY: Use truncated key for logging
+		SafeLogAuth("rekeyed_attempt", identity.Idk, false)
 		if req.Client.Cmd != "query" {
 			response.WithCommandFailed()
 		}
@@ -290,7 +313,7 @@ func (api *SqrlSspAPI) knownIdentity(req *CliRequest, response *CliResponse, ide
 	if req.Client.Cmd == "enable" || req.Client.Cmd == "remove" {
 		err := req.VerifyUrs(identity.Vuk)
 		if err != nil {
-			log.Printf("enable command failed urs validation")
+			SafeLogError("urs_validation", err)
 			// TODO: remove since sig check failed here?
 			if identity.Disabled {
 				response.WithSQRLDisabled()
@@ -299,18 +322,18 @@ func (api *SqrlSspAPI) knownIdentity(req *CliRequest, response *CliResponse, ide
 			return fmt.Errorf("identity error")
 		}
 		if req.Client.Cmd == "enable" {
-			log.Printf("Reenabled account: %v", identity.Idk)
+			SafeLogAuth("enable_account", identity.Idk, true)
 			identity.Disabled = false
 			changed = true
 		} else if req.Client.Cmd == "remove" {
 			err := api.removeIdentity(identity)
 			if err != nil {
-				log.Printf("Failed removing identity %v: %v", identity.Idk, err)
+				SafeLogError("remove_identity", err)
 				response.WithClientFailure().WithCommandFailed()
 				return fmt.Errorf("identity error")
 			}
 			response.ClearIDMatch()
-			log.Printf("removed identity %v", identity.Idk)
+			SafeLogAuth("remove_identity", identity.Idk, true)
 		}
 	}
 	if req.Client.Cmd == "disable" {
@@ -325,7 +348,7 @@ func (api *SqrlSspAPI) knownIdentity(req *CliRequest, response *CliResponse, ide
 	if changed {
 		err := api.authStore.SaveIdentity(identity)
 		if err != nil {
-			log.Printf("Failed saving identity %v: %v", identity.Idk, err)
+			SafeLogError("save_identity", err)
 			response.WithClientFailure().WithCommandFailed()
 			return fmt.Errorf("identity error")
 		}

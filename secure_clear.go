@@ -1,0 +1,138 @@
+package ssp
+
+import (
+	"runtime"
+)
+
+// ClearBytes securely clears a byte slice by overwriting with zeros.
+// ClearBytes overwrites every element of b with zero.
+// If b is empty, ClearBytes does nothing.
+// It calls runtime.KeepAlive(b) to prevent the compiler from eliding the overwrite.
+func ClearBytes(b []byte) {
+	if len(b) == 0 {
+		return
+	}
+	for i := range b {
+		b[i] = 0
+	}
+	// Memory fence to prevent compiler optimization
+	runtime.KeepAlive(b)
+}
+
+// ClearString clears a string reference by setting it to empty string.
+//
+// IMPORTANT SECURITY LIMITATION: Go strings are immutable by design and may be
+// stored in read-only memory (especially string literals). Unlike languages like C,
+// Go does not support secure memory clearing for strings because:
+//
+// 1. String literals are stored in read-only program segments
+// 2. Strings may be interned and shared across the program
+// 3. The Go runtime does not provide safe memory clearing APIs for strings
+//
+// This function sets the string pointer to empty string to prevent further access,
+// but the original data may remain in memory until garbage collected.
+//
+// For sensitive data that must be securely cleared, use []byte instead of string
+// and call ClearBytes or ClearBytesSecure. Byte slices are mutable and can be
+// reliably overwritten.
+func ClearString(s *string) {
+	if s == nil || *s == "" {
+		return
+	}
+
+	// Set string pointer to empty to prevent further access
+	// NOTE: We cannot safely clear the underlying memory because:
+	// - String literals are in read-only memory (causes SIGSEGV)
+	// - Interned strings may be shared
+	// - The GC will eventually reclaim the memory
+	*s = ""
+	runtime.KeepAlive(s)
+}
+
+// Clear securely clears all sensitive fields in SqrlIdentity
+func (si *SqrlIdentity) Clear() {
+	if si == nil {
+		return
+	}
+	ClearString(&si.Idk)
+	ClearString(&si.Suk)
+	ClearString(&si.Vuk)
+	ClearString(&si.Pidk)
+	ClearString(&si.Rekeyed)
+	si.SQRLOnly = false
+	si.Hardlock = false
+	si.Disabled = false
+	si.Btn = 0
+}
+
+// Clear securely clears all sensitive fields in ClientBody
+func (cb *ClientBody) Clear() {
+	if cb == nil {
+		return
+	}
+	ClearString(&cb.Suk)
+	ClearString(&cb.Vuk)
+	ClearString(&cb.Pidk)
+	ClearString(&cb.Idk)
+	cb.Version = nil
+	cb.Cmd = ""
+	cb.Opt = nil
+	cb.Btn = 0
+}
+
+// Clear securely clears all sensitive signature data in CliRequest
+func (cr *CliRequest) Clear() {
+	if cr == nil {
+		return
+	}
+	ClearString(&cr.Ids)
+	ClearString(&cr.Pids)
+	ClearString(&cr.Urs)
+	ClearString(&cr.ClientEncoded)
+	ClearString(&cr.Server)
+	ClearString(&cr.IPAddress)
+	if cr.Client != nil {
+		cr.Client.Clear()
+	}
+}
+
+// Clear securely clears cached sensitive data in HoardCache
+func (hc *HoardCache) Clear() {
+	if hc == nil {
+		return
+	}
+	if hc.Identity != nil {
+		hc.Identity.Clear()
+	}
+	if hc.LastRequest != nil {
+		hc.LastRequest.Clear()
+	}
+	ClearBytes(hc.LastResponse)
+	hc.State = ""
+	hc.RemoteIP = ""
+	hc.OriginalNut = ""
+	hc.PagNut = ""
+}
+
+// ClearBytesSecure provides an additional layer of clearing with multiple passes.
+// ClearBytesSecure overwrites the provided byte slice three times (zero, 0xFF, zero) to reduce the risk that compiler optimizations leave sensitive data in memory.
+// If the slice is empty the function returns immediately. It uses only safe Go operations (no unsafe pointers) and calls runtime.KeepAlive to ensure the slice is retained until the clears complete.
+func ClearBytesSecure(b []byte) {
+	if len(b) == 0 {
+		return
+	}
+	// First pass: zero out
+	for i := range b {
+		b[i] = 0
+	}
+	// Second pass: pattern fill (prevents optimization)
+	for i := range b {
+		b[i] = 0xFF
+	}
+	// Third pass: final zero
+	for i := range b {
+		b[i] = 0
+	}
+	// Memory fence to prevent compiler optimization
+	runtime.KeepAlive(b)
+}
