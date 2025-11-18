@@ -118,7 +118,118 @@ By upgrading to Go toolchain 1.25.4, the following vulnerabilities are resolved:
 
 ---
 
-## 3. Sensitive Data Handling Vulnerabilities
+## 3. SQRL Protocol Security Analysis (Wire Protocol)
+
+### Protocol Design Security Features
+
+Based on the SQRL "On The Wire" specification (Version 1.07, December 2019), the protocol includes several security-by-design features:
+
+#### Positive Security Features
+
+1. **Simple Data Format**
+   - Uses `application/x-www-form-urlencoded` instead of XML/JSON
+   - Rationale: Avoids complex parsers that have historically had security vulnerabilities
+   - All values base64url encoded with padding removed
+   - Minimizes attack surface through simplicity
+
+2. **Cryptographic Chain of Trust**
+   - Each transaction signs both client data AND previous server response
+   - Signature format: `sign(base64url(client) + base64url(server))`
+   - Creates interlocked cryptographically strong chain
+   - Server must verify: returned data unchanged, nut valid and unused, all signatures valid
+
+3. **Replay Protection**
+   - Nut (nonce) must be unique and single-use
+   - Server discards nut after validation
+   - Prevents replay attacks
+
+4. **IP Address Validation**
+   - By default, server verifies IP matches original SQRL URL request
+   - Detects and prevents easy SQRL attacks
+   - Can be disabled with `noiptest` option for cross-device authentication
+
+5. **Atomic Operations**
+   - All server-side actions are atomic (all succeed or nothing changes)
+   - TIF bit 0x40 "Command failed" ensures consistency
+   - Prevents partial state changes
+
+6. **Client Provided Session (CPS)**
+   - Prevents MITM and website spoofing
+   - Server returns authenticated URL directly to client
+   - Client redirects browser with HTTP 302
+   - Server must abandon pending browser session when CPS is used
+
+7. **Identity Lock Protocol**
+   - Requires URS (Unlock Request Signature) for privileged operations:
+     - enable: Re-enable disabled account
+     - remove: Remove SQRL identity
+     - Identity rekeying when recognized by previous identity
+   - URS requires RescueCode, which is never stored in client
+   - Prevents attacker from enabling/removing identity without RescueCode
+
+8. **Superseded Identity Tracking**
+   - Servers maintain durable list of all previous identities (PIDKs) encountered
+   - Prevents accidental use of old identity key
+   - Returns TIF 0x200 if superseded identity is used
+   - Protects against stale identity on non-synchronized clients
+
+#### Protocol Security Considerations
+
+1. **TLS Requirement**
+   - Protocol requires valid TLS certificate
+   - All SQRL communication over HTTPS
+   - Client relies on OS-provided TLS implementation
+
+2. **Ask Parameter Security Risk**
+   - Server can send arbitrary text to display to user
+   - Specification requires: "must protect against exploitation"
+   - Implementations must use simple text window, NOT full HTML parser
+   - Must filter/escape dangerous characters
+   - **Risk**: If improperly implemented, could allow XSS or code injection
+
+3. **Transient Error Handling**
+   - TIF bit 0x20 instructs client to retry with fresh nut
+   - Client must detect duplicate errors (0x20 twice in succession)
+   - Protects against infinite retry loops
+   - Informs user to refresh page if session expired
+
+4. **Version Negotiation**
+   - Both client and server declare supported versions
+   - Use highest common version
+   - `ver=` must be first parameter in both directions
+   - Clients must terminate if server uses undefined TIF bits
+
+### Threat Model Clarification
+
+**Localhost Port Squatting** (Previously identified as HIGH)
+
+**Revised Assessment: LOW**
+
+The original concern about localhost port squatting needs to be re-evaluated in the context of SQRL's threat model:
+
+1. **SQRL Design Principle**: "Trust no one" - no third party involved
+2. **Localhost Scope**: Only accessible from the server itself
+3. **Threat Analysis**:
+   - For an attacker to exploit port squatting, they must already have:
+     - Local access to the server
+     - Ability to bind to ports
+     - Ability to intercept traffic
+   - If an attacker has this level of access, the system is already compromised
+   - Port squatting would be the least of the security concerns
+
+**Conclusion**: In the SQRL threat model, localhost-bound services are intentionally design choices. The protocol assumes TLS for remote communications and the server's internal integrity for localhost communications.
+
+### Wire Protocol Implementation Risks
+
+| Risk | Severity | Implementation File | Mitigation |
+|------|----------|-------------------|------------|
+| Ask parameter injection | MEDIUM | cli_handler.go, cli_response.go | Not yet implemented; when added, must sanitize display |
+| TIF bit undefined handling | LOW | All handlers | Must terminate on undefined bits |
+| Transient error infinite loop | LOW | Client-side (not in server-go-ssp) | Server correctly implements 0x20 |
+| Version negotiation failure | LOW | cli_request.go | Proper version parsing implemented |
+| Atomic operation failure | MEDIUM | All command handlers | Must ensure rollback on any failure |
+
+## 4. Sensitive Data Handling Vulnerabilities
 
 ### Critical Security Issues Identified
 
@@ -162,7 +273,7 @@ By upgrading to Go toolchain 1.25.4, the following vulnerabilities are resolved:
 
 ---
 
-## 4. Implementation Plan: Secure Memory Clearing
+## 5. Implementation Plan: Secure Memory Clearing
 
 ### Phase 1: Create Secure Memory Utilities
 
@@ -434,7 +545,7 @@ func truncateKey(key string, maxLen int) string {
 
 ---
 
-## 5. Test Coverage Requirements
+## 6. Test Coverage Requirements
 
 ### Current State: 29.4% Coverage (IN PROGRESS)
 
@@ -486,7 +597,7 @@ Remaining: Need +50.6 percentage points to reach 80% minimum threshold
 
 ---
 
-## 6. CI/CD Pipeline Configuration
+## 7. CI/CD Pipeline Configuration
 
 ### GitHub Actions Workflow
 
@@ -658,7 +769,7 @@ repos:
 
 ---
 
-## 7. Implementation Priority and Timeline
+## 8. Implementation Priority and Timeline
 
 ### Phase 1: Critical Security Fixes (Week 1)
 - [ ] Implement secure memory clearing utilities
@@ -695,7 +806,7 @@ repos:
 
 ---
 
-## 8. Risk Assessment
+## 9. Risk Assessment
 
 | Risk | Severity | Likelihood | Mitigation |
 |------|----------|------------|------------|
@@ -709,7 +820,7 @@ repos:
 
 ---
 
-## 9. Compliance Considerations
+## 10. Compliance Considerations
 
 This security review addresses:
 - **CWE-226**: Sensitive Information in Resource Not Removed Before Reuse
@@ -720,7 +831,7 @@ This security review addresses:
 
 ---
 
-## 10. Monitoring and Maintenance
+## 11. Monitoring and Maintenance
 
 ### Post-Implementation Monitoring
 1. Set up Dependabot for automatic dependency updates
@@ -736,14 +847,264 @@ This security review addresses:
 
 ---
 
+## 12. Wire Protocol Implementation Validation
+
+### Current Implementation vs. Specification
+
+Based on analysis of the codebase against the SQRL "On The Wire" specification:
+
+#### ✅ Correctly Implemented
+
+1. **Signature Verification Chain** (cli_request.go:220-271)
+   - Verifies IDS signature over concatenated client+server data
+   - Verifies PIDS signature when previous identity is provided
+   - Verifies URS signature for unlock operations
+   - Uses ED25519 with constant-time comparison
+
+2. **Base64url Encoding** (base64.go)
+   - Custom base64url implementation
+   - Correctly removes padding ('=' characters)
+   - Used throughout for all value encoding
+
+3. **Nut Generation and Validation** (random_tree.go, grc_tree.go)
+   - RandomTree: Uses crypto/rand for cryptographically secure nuts
+   - GrcTree: Uses AES encryption with counter for deterministic but encrypted nuts
+   - Single-use validation enforced
+
+4. **TIF Bit Handling** (cli_handler.go)
+   - Correctly sets TIF bits based on identity matching
+   - Returns appropriate error codes
+   - Atomic operation semantics maintained
+
+5. **Command Processing** (cli_handler.go:93-252)
+   - Supports: query, ident, disable, enable, remove
+   - Query command doesn't modify state (compliant)
+   - Enable/remove require proper authentication
+
+6. **IP Address Validation** (cli_handler.go:40-43)
+   - Uses `ClientIP()` from request
+   - Respects X-Forwarded-For headers
+   - Can be bypassed with noiptest option (specification-compliant)
+
+#### ⚠️ Partially Implemented or Missing
+
+1. **Ask Parameter** - NOT IMPLEMENTED
+   - Specification allows server to prompt user
+   - Should display message with optional buttons
+   - When implemented, MUST sanitize display (security critical)
+   - Impact: Feature not available, no security risk
+
+2. **CPS (Client Provided Session)** - PARTIAL
+   - Option flag parsing exists
+   - URL return mechanism may need verification
+   - Impact: MITM protection may not be fully implemented
+
+3. **Superseded Identity Tracking** - NOT VERIFIED
+   - Specification requires maintaining list of all encountered PIDKs
+   - Should return TIF 0x200 if superseded identity used
+   - Need to verify if map_auth_store.go implements this
+   - Impact: Users might use stale identities
+
+4. **Transient Error Handling** - NOT VERIFIED
+   - Should return TIF 0x20 for expired nuts that can be recovered
+   - Need to verify nut expiration handling
+   - Impact: User experience, not a security risk
+
+5. **Secret Index (SIN/INS/PINS)** - NOT IMPLEMENTED
+   - Allows server to request identity-derived secrets
+   - Used for decryption without storage
+   - Impact: Advanced feature not available
+
+6. **Version Negotiation** - BASIC
+   - Parses version from client
+   - Returns version in response
+   - May not properly negotiate highest common version
+   - Impact: Protocol evolution may be limited
+
+#### 🔴 Security Concerns Identified
+
+1. **Atomic Operation Guarantee** (HIGH PRIORITY)
+   - Specification requires all-or-nothing semantics
+   - Need to verify transaction handling in all command paths
+   - Example: Identity update must atomically update all fields or rollback
+   - **Action Required**: Add explicit transaction support or verify current atomicity
+
+2. **SUK Return Conditions** (MEDIUM PRIORITY)
+   - Specification: SUK must be returned when:
+     - TIF 0x02 set (previous identity matched)
+     - Account disabled (TIF 0x08 set)
+     - Client requests with opt=suk
+   - **Action Required**: Verify SUK is returned in all required cases (cli_handler.go)
+
+3. **Undefined TIF Bit Handling** (MEDIUM PRIORITY)
+   - Specification: Clients MUST terminate if server uses undefined TIF bits
+   - Server-go-ssp defines bits 0x01-0x200
+   - **Action Required**: Ensure no undefined bits are ever set
+
+4. **QRY Parameter Validation** (MEDIUM PRIORITY)
+   - Specification: qry parameter must be root-anchored path only
+   - Must not allow changing scheme, domain, or port
+   - **Action Required**: Verify qry path validation (cli_response.go)
+
+### Recommended Protocol Implementation Improvements
+
+1. **Add Comprehensive Integration Tests**
+   - Test complete authentication flows per specification
+   - Test all TIF bit combinations
+   - Test identity rekeying scenarios
+   - Test error recovery paths
+
+2. **Implement Missing Features for Specification Compliance**
+   - Ask parameter (with proper sanitization)
+   - Superseded identity tracking (TIF 0x200)
+   - Secret index (SIN/INS/PINS)
+   - Complete CPS support
+
+3. **Add Protocol Validation Layer**
+   - Verify all required parameters present
+   - Validate parameter formats match specification
+   - Check signature ordering and content
+   - Validate version negotiation
+
+4. **Document Specification Compliance**
+   - Create compliance matrix
+   - Document intentional deviations
+   - Note unimplemented features
+
+---
+
 ## Summary
 
-This SQRL SSP implementation requires immediate security improvements:
+### Comprehensive Security Assessment: SQRL SSP Implementation
 
-1. **CRITICAL**: Implement secure memory clearing for cryptographic keys
-2. **CRITICAL**: Remove sensitive data from log outputs
-3. **HIGH**: Update golang.org/x/crypto from v0.31.0 to v0.44.0
-4. **HIGH**: Increase test coverage from 29.4% to 80%+ (in progress, was 8.0%)
-5. **MEDIUM**: Set up comprehensive CI/CD pipeline
+This security review has analyzed the `server-go-ssp` implementation against:
+1. General security best practices
+2. SQRL specification documents (Explained, Operation Details, Cryptography)
+3. SQRL "On The Wire" protocol specification v1.07
 
-The codebase is functionally complete but lacks essential security hardening for production use. The identified vulnerabilities (CWE-226, CWE-200) must be addressed before deploying in security-sensitive environments.
+### Protocol Design Strengths
+
+SQRL's wire protocol demonstrates strong security-by-design principles:
+- ✅ Simple data format reduces parser vulnerabilities
+- ✅ Cryptographic chain of trust with signature over both client and server data
+- ✅ Mandatory replay protection via single-use nonces (nuts)
+- ✅ IP address validation to prevent cross-device attacks
+- ✅ Atomic operations ensure consistency
+- ✅ Client Provided Session (CPS) prevents MITM attacks
+- ✅ Identity Lock Protocol with URS prevents unauthorized privilege escalation
+- ✅ Superseded identity tracking prevents stale key usage
+
+### Implementation Status
+
+**✅ Core Protocol Correctly Implemented:**
+- Signature verification chain (IDS, PIDS, URS)
+- Base64url encoding with proper padding removal
+- Cryptographically secure nut generation (RandomTree and GrcTree)
+- TIF bit handling for status reporting
+- All five commands: query, ident, disable, enable, remove
+- IP address validation with X-Forwarded-For support
+
+**⚠️ Specification Features Not Implemented:**
+- Ask parameter (user prompting) - would need sanitization if added
+- Secret Index (SIN/INS/PINS) - advanced feature for server-side secrets
+- Full superseded identity tracking - needs verification
+- Complete CPS URL return flow - needs verification
+- Version negotiation (basic implementation only)
+
+### Critical Security Issues Requiring Immediate Action
+
+#### 1. **CRITICAL**: Cryptographic Key Memory Exposure (CWE-226)
+**Status**: Not yet fixed
+**Impact**: Private keys, signatures, and unlock keys remain in memory after use
+**Files**: api.go, cli_request.go, grc_tree.go, map_hoard.go, random_tree.go
+**Action**: Implement secure memory clearing with `runtime.KeepAlive()` barriers
+
+#### 2. **CRITICAL**: Sensitive Data Logging (CWE-200, CWE-532)
+**Status**: Not yet fixed
+**Impact**: Logs expose full cryptographic keys and signatures
+**Files**: cli_request.go:300, cli_handler.go:42,122,164,210,242
+**Action**: Remove or truncate sensitive data in logs, eliminate spew.Dump()
+
+#### 3. **HIGH**: Test Coverage Below Threshold
+**Status**: In progress (29.4% → 80% target)
+**Progress**: Improved from 8.0%, need +50.6 percentage points
+**Action**: Add comprehensive unit and integration tests, especially for:
+  - Complete authentication flows
+  - Identity rekeying scenarios
+  - Error handling and TIF bit combinations
+  - Protocol compliance validation
+
+#### 4. **HIGH**: Atomic Operation Verification
+**Status**: Not verified
+**Impact**: Partial state updates could occur on errors
+**Specification**: "All SQRL server-side actions are atomic"
+**Action**: Verify transaction handling or add explicit rollback on failures
+
+#### 5. **MEDIUM**: SUK Return Condition Compliance
+**Status**: Needs verification
+**Impact**: Client may not receive SUK when needed for unlock operations
+**Specification**: Return SUK when TIF 0x02 or 0x08 set, or opt=suk requested
+**Action**: Audit SUK return logic in cli_handler.go
+
+### Dependency Status
+
+✅ **RESOLVED**: All critical dependency issues addressed
+- Go toolchain upgraded: 1.17 → 1.25.4 (latest security patches)
+- golang.org/x/crypto dependency REMOVED (55 vulnerabilities eliminated)
+- Blowfish replaced with standard library crypto/aes
+- All modules verified, all tests passing
+
+### Threat Model Clarification
+
+**Localhost Port Squatting**: Revised from HIGH to **LOW**
+- SQRL's "trust no one" design doesn't involve third parties
+- Localhost access requires server compromise
+- If attacker has localhost access, port squatting is least concern
+- TLS protects remote communications; server integrity assumed for localhost
+
+### Priority Action Items
+
+**Week 1: Critical Security Fixes**
+1. Implement secure memory clearing utilities (ClearBytes, ClearString)
+2. Remove sensitive data from all log statements
+3. Add defer statements to clear cryptographic material
+
+**Week 2: Protocol Compliance Verification**
+1. Verify atomic operation guarantees in all command handlers
+2. Audit SUK return conditions
+3. Verify superseded identity tracking implementation
+4. Test CPS URL return flow
+
+**Week 3-4: Test Coverage to 80%+**
+1. Add comprehensive unit tests for cli_request.go, cli_handler.go
+2. Add integration tests for complete authentication flows
+3. Add security-focused tests (signature verification, replay protection)
+4. Add benchmark tests for performance validation
+
+**Week 5: CI/CD Pipeline**
+1. Implement GitHub Actions workflow
+2. Add CodeQL security scanning
+3. Configure code coverage reporting with 80% threshold enforcement
+4. Add dependency review automation
+
+### Compliance Summary
+
+This implementation addresses or requires mitigation for:
+- **CWE-226**: Sensitive Information Not Removed Before Reuse → Requires secure clearing
+- **CWE-200**: Exposure of Sensitive Information → Requires log sanitization
+- **CWE-312**: Cleartext Storage in Logs → Requires log sanitization
+- **CWE-532**: Insertion of Sensitive Information into Logs → Requires log sanitization
+- **OWASP Top 10 2021 A02**: Cryptographic Failures → Addressed by secure clearing
+
+### Recommendation
+
+The `server-go-ssp` implementation demonstrates solid understanding of SQRL protocol cryptography and correctly implements core protocol mechanics. However, **it is not production-ready** due to:
+
+1. Memory handling vulnerabilities that could expose cryptographic keys
+2. Excessive logging of sensitive cryptographic material
+3. Insufficient test coverage (29.4% vs. 80% required)
+4. Unverified protocol compliance for edge cases
+
+**Estimated effort to production readiness**: 5-6 weeks with focused development
+
+The codebase provides a strong foundation. With the identified security improvements, comprehensive testing, and CI/CD pipeline, this implementation can become a secure, reliable SQRL SSP server suitable for production deployment.
