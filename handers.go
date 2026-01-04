@@ -1,13 +1,16 @@
 package ssp
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 
-	qrcode "github.com/skip2/go-qrcode"
+	"github.com/yeqown/go-qrcode/v2"
+	"github.com/yeqown/go-qrcode/writer/standard"
 )
 
 type nutJSON struct {
@@ -118,12 +121,29 @@ func (api *SqrlSspAPI) PNG(w http.ResponseWriter, r *http.Request) {
 
 	value := sqrlURL.String()
 
-	png, err := qrcode.Encode(value, qrcode.Medium, -5)
+	// Create QR code with medium error correction
+	qrc, err := qrcode.NewWith(value,
+		qrcode.WithEncodingMode(qrcode.EncModeByte),
+		qrcode.WithErrorCorrectionLevel(qrcode.ErrorCorrectionMedium),
+	)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("Failed create of PNG"))
+		_, _ = w.Write([]byte("Failed to create QR code"))
 		return
 	}
+
+	// Generate PNG to bytes buffer
+	buf := bytes.NewBuffer(nil)
+	qrWriter := standard.NewWithWriter(&nopCloser{Writer: buf},
+		standard.WithQRWidth(10),
+		standard.WithBuiltinImageEncoder(standard.PNG_FORMAT),
+	)
+	if err = qrc.Save(qrWriter); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("Failed to encode PNG"))
+		return
+	}
+	png := buf.Bytes()
 
 	if hoardCache != nil {
 		w.Header().Add("Sqrl-Nut", string(hoardCache.OriginalNut))
@@ -195,3 +215,10 @@ func (api *SqrlSspAPI) Pag(w http.ResponseWriter, r *http.Request) {
 
 	_, _ = w.Write([]byte(api.Authenticator.AuthenticateIdentity(hoardCache.Identity)))
 }
+
+// nopCloser wraps an io.Writer to add a no-op Close() method, making it an io.WriteCloser
+type nopCloser struct {
+	io.Writer
+}
+
+func (nopCloser) Close() error { return nil }

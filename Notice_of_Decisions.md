@@ -424,9 +424,10 @@ func ClearBytes(b []byte) {
 
 These decisions are NOT defined by the SQRL protocol and require business/operational decisions.
 
-### 🔴 DECISION-001: Production Storage Backend Choice
-**Status:** NOT DEFINED BY PROTOCOL
+### ✅ DECISION-001: Production Storage Backend Choice
+**Status:** RESOLVED - Redis + PostgreSQL
 **Priority:** CRITICAL
+**Decision Date:** November 19, 2025
 
 #### Protocol Guidance
 
@@ -442,21 +443,31 @@ The SQRL protocol does NOT mandate specific storage backends. Protocol only requ
 - Option C: Hybrid ✅ Meets protocol requirements
 - Option D: MapHoard ❌ Does NOT meet "persist across restarts" requirement
 
-#### Stakeholder Decision Required
+#### Decision Made
 
-**Questions:**
-1. What is the expected deployment model? (single-server, multi-server, multi-datacenter)
-2. What is the expected scale? (users, requests/second)
-3. What is the operational team's expertise? (Redis/PostgreSQL vs etcd)
-4. What is the budget for infrastructure?
+**Selected Option:** Redis + PostgreSQL (Option A)
 
-**Recommendation:** Redis + PostgreSQL for MVP, migrate to etcd for scale.
+**Rationale:**
+- Target deployment: Single server (MVP)
+- No need for distributed coordination (etcd)
+- Use existing implementations:
+  - RedisHoard: github.com/sqrldev/server-go-ssp-redishoard
+  - GormAuthStore: github.com/sqrldev/server-go-ssp-gormauthstore (PostgreSQL/MySQL)
+- Simpler operational model
+- Well-understood infrastructure
+- Can migrate to etcd later if horizontal scaling is needed
+
+**Implementation Plan:**
+1. Document existing Redis + PostgreSQL implementations
+2. Update deployment guide with Redis/PostgreSQL setup
+3. Skip Stage 3 (etcd) from DEPENDENCY_UPGRADE_PLAN.md
 
 ---
 
-### 🔴 DECISION-002: Test Coverage Priority
-**Status:** NOT DEFINED BY PROTOCOL
+### ✅ DECISION-002: Test Coverage Priority
+**Status:** RESOLVED - Critical Paths First
 **Priority:** CRITICAL
+**Decision Date:** November 19, 2025
 
 #### Protocol Guidance
 
@@ -468,20 +479,34 @@ The SQRL protocol does NOT define testing requirements. This is a quality/operat
 - TIF flag handling (cli_response.go)
 - Nut generation and validation (grc_tree.go, random_tree.go)
 
-#### Stakeholder Decision Required
+#### Decision Made
 
-**Questions:**
-1. Is 3-week timeline for 80% coverage acceptable?
-2. Can we deploy with <80% if critical paths are well-tested?
-3. Should we prioritize CI passing (80%) or critical path coverage?
+**Selected Approach:** Critical Paths First
 
-**Recommendation:** Blended approach - critical paths first, then breadth.
+**Coverage Targets:**
+- cli_request.go (signature verification): 90%+ (currently ~10%)
+- cli_handler.go (authentication flows): 90%+ (currently 0%)
+- cli_response.go (TIF flags, encoding): 85%+ (currently ~15%)
+- api.go (identity management): 80%+ (currently 0%)
+- Other components: 60%+ minimum
+
+**Timeline:**
+- Week 1-2: Critical path testing (cli_request.go, cli_handler.go)
+- Week 3: Secondary components (cli_response.go, api.go, handers.go)
+- Target: Reach 80% overall by focusing on high-value security components
+
+**Rationale:**
+- Ensures critical security paths are well-tested first
+- Faster path to CI/CD compliance
+- Allows deployment with confidence in authentication security
+- Breadth coverage can continue after MVP deployment
 
 ---
 
-### 🟠 DECISION-003: Rate Limiting Strategy
-**Status:** NOT DEFINED BY PROTOCOL
+### ✅ DECISION-003: Rate Limiting Strategy
+**Status:** RESOLVED - In-Memory (Simple)
 **Priority:** HIGH
+**Decision Date:** November 19, 2025
 
 #### Protocol Guidance
 
@@ -497,14 +522,46 @@ From SQRL Draft Specification:
 - Implementation approach (in-memory vs distributed)
 - Threshold values
 
-#### Stakeholder Decision Required
+#### Decision Made
 
-**Questions:**
-1. What rate limits are acceptable? (10 requests/min? 60 requests/min?)
-2. Should rate limiting be per-IP, per-identity, or both?
-3. Is distributed rate limiting needed (multi-server deployment)?
+**Selected Option:** In-Memory Rate Limiting (golang.org/x/time/rate)
 
-**Recommendation:** Start with in-memory (10 req/min for /cli.sqrl), upgrade to distributed in Stage 3.
+**Rate Limits:**
+- `/cli.sqrl`: 10 requests per minute per IP address
+- `/nut.sqrl`: 60 requests per minute per IP address
+- `/png.sqrl`: 30 requests per minute per IP address
+- `/pag.sqrl`: 60 requests per minute per IP address
+
+**Implementation:**
+```go
+import "golang.org/x/time/rate"
+
+type rateLimiter struct {
+    limiters map[string]*rate.Limiter
+    mu       sync.RWMutex
+}
+
+func (rl *rateLimiter) allow(ip string, r int) bool {
+    rl.mu.RLock()
+    limiter, exists := rl.limiters[ip]
+    rl.mu.RUnlock()
+
+    if !exists {
+        rl.mu.Lock()
+        limiter = rate.NewLimiter(rate.Limit(r), r*2)
+        rl.limiters[ip] = limiter
+        rl.mu.Unlock()
+    }
+
+    return limiter.Allow()
+}
+```
+
+**Rationale:**
+- Single-server deployment (no need for distributed coordination)
+- Simple implementation with standard library
+- Per-IP limiting prevents brute force attacks
+- Can upgrade to distributed rate limiting if scaling to multi-server
 
 ---
 
