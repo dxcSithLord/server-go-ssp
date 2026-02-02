@@ -20,6 +20,7 @@ func (api *SqrlSspAPI) Cli(w http.ResponseWriter, r *http.Request) {
 	SafeLogInfo("Req: %v", sanitizeForLog(r.URL.String()))
 	nut := Nut(r.URL.Query().Get("nut"))
 	if nut == "" {
+		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write(NewCliResponse("", "").WithClientFailure().Encode())
 		return
 	}

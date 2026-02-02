@@ -100,6 +100,8 @@ func (api *SqrlSspAPI) PNG(w http.ResponseWriter, r *http.Request) {
 	nut := r.URL.Query().Get("nut")
 	var hoardCache *HoardCache
 	var err error
+	nutWasProvided := nut != ""
+
 	if nut == "" {
 		// create a nut
 		hoardCache, err = api.createAndSaveNut(r)
@@ -108,6 +110,21 @@ func (api *SqrlSspAPI) PNG(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		nut = string(hoardCache.OriginalNut)
+	} else {
+		// Validate provided nut exists in hoard
+		_, err = api.hoard.Get(Nut(nut))
+		if err != nil {
+			if err == ErrNotFound {
+				// SECURITY: Sanitize nut value to prevent log injection
+				SafeLogInfo("PNG requested with invalid nut: %s", sanitizeForLog(nut))
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte("Invalid or expired nut"))
+				return
+			}
+			SafeLogError("png_nut_lookup", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 
 	params := make(url.Values)
@@ -145,7 +162,8 @@ func (api *SqrlSspAPI) PNG(w http.ResponseWriter, r *http.Request) {
 	}
 	png := buf.Bytes()
 
-	if hoardCache != nil {
+	// Only add nut headers when we generated a new nut (not when client provided one)
+	if !nutWasProvided && hoardCache != nil {
 		w.Header().Add("Sqrl-Nut", string(hoardCache.OriginalNut))
 		w.Header().Add("Sqrl-Pag", string(hoardCache.PagNut))
 		w.Header().Add("Sqrl-Exp", fmt.Sprintf("%d", api.NutExpirationSeconds()))
@@ -176,7 +194,24 @@ func (api *SqrlSspAPI) Pag(w http.ResponseWriter, r *http.Request) {
 	hoardCache, err := api.getAndDelete(Nut(pagnut))
 	if err != nil {
 		if err == ErrNotFound {
-			w.WriteHeader(http.StatusNotFound)
+			// SECURITY: Sanitize pagnut value to prevent log injection
+			SafeLogInfo("Pag polling for pending authentication: %s", sanitizeForLog(pagnut))
+			// Return 200 OK with empty response to indicate authentication still pending
+			// This allows clients to poll without error until auth completes
+			if r.Header.Get("Accept") == "application/json" {
+				w.Header().Add("Content-Type", "application/json")
+				respObj := &pagJSON{URL: ""}
+				enc, err := json.Marshal(respObj)
+				if err != nil {
+					SafeLogError("json_encode_pag_pending", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				_, _ = w.Write(enc)
+				return
+			}
+			// For non-JSON requests, return empty body
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 		SafeLogError("pag_nut_lookup", err)
