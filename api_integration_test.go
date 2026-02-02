@@ -45,7 +45,7 @@ func setupTestServer(t *testing.T) (*httptest.Server, *SqrlSspAPI) {
 	mux.HandleFunc("/pag.sqrl", api.Pag)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("<!DOCTYPE html><html><body>Demo Page</body></html>"))
+		_, _ = w.Write([]byte("<!DOCTYPE html><html><body>Demo Page</body></html>"))
 	})
 
 	server := httptest.NewServer(mux)
@@ -103,7 +103,7 @@ func TestNutEndpoint_FormEncoded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
@@ -117,7 +117,10 @@ func TestNutEndpoint_FormEncoded(t *testing.T) {
 	}
 
 	// Parse response
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
 	values, err := url.ParseQuery(string(body))
 	if err != nil {
 		t.Fatalf("Failed to parse form response: %v", err)
@@ -134,10 +137,10 @@ func TestNutEndpoint_FormEncoded(t *testing.T) {
 		t.Error("Missing exp parameter")
 	}
 
-	// Verify nut length (should be 22 characters for AES-based nuts)
+	// Verify nut length (11 chars for 8-byte RandomTree, 22 for 16-byte GrcTree)
 	nut := values.Get("nut")
-	if len(nut) != 22 {
-		t.Errorf("Expected nut length 22, got %d", len(nut))
+	if len(nut) != 11 && len(nut) != 22 {
+		t.Errorf("Expected nut length 11 or 22, got %d", len(nut))
 	}
 
 	t.Logf("✓ /nut.sqrl form-encoded response: nut=%s, pag=%s, exp=%s",
@@ -156,7 +159,7 @@ func TestNutEndpoint_JSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check content type
 	contentType := resp.Header.Get("Content-Type")
@@ -202,7 +205,7 @@ func TestPngEndpoint_WithoutNut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
@@ -227,7 +230,10 @@ func TestPngEndpoint_WithoutNut(t *testing.T) {
 	}
 
 	// Verify PNG signature (first 8 bytes)
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
 	pngSignature := []byte{137, 80, 78, 71, 13, 10, 26, 10}
 	if len(body) < 8 || !bytes.Equal(body[:8], pngSignature) {
 		t.Error("Response is not a valid PNG file")
@@ -241,8 +247,15 @@ func TestPngEndpoint_WithNut(t *testing.T) {
 	defer server.Close()
 
 	// First, get a nut
-	nutResp, _ := http.Get(server.URL + "/nut.sqrl")
-	nutBody, _ := io.ReadAll(nutResp.Body)
+	nutResp, err := http.Get(server.URL + "/nut.sqrl")
+	if err != nil {
+		t.Fatalf("Failed to get nut: %v", err)
+	}
+	defer func() { _ = nutResp.Body.Close() }()
+	nutBody, err := io.ReadAll(nutResp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read nut response: %v", err)
+	}
 	nutValues, _ := url.ParseQuery(string(nutBody))
 	nut := nutValues.Get("nut")
 
@@ -251,7 +264,7 @@ func TestPngEndpoint_WithNut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
@@ -264,7 +277,10 @@ func TestPngEndpoint_WithNut(t *testing.T) {
 	}
 
 	// Verify PNG is valid
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
 	pngSignature := []byte{137, 80, 78, 71, 13, 10, 26, 10}
 	if !bytes.Equal(body[:8], pngSignature) {
 		t.Error("Response is not a valid PNG file")
@@ -282,7 +298,7 @@ func TestPngEndpoint_InvalidNut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should return error (400 or 500)
 	if resp.StatusCode == http.StatusOK {
@@ -301,8 +317,15 @@ func TestPagEndpoint_Pending(t *testing.T) {
 	defer server.Close()
 
 	// Get nut and pag
-	nutResp, _ := http.Get(server.URL + "/nut.sqrl")
-	nutBody, _ := io.ReadAll(nutResp.Body)
+	nutResp, err := http.Get(server.URL + "/nut.sqrl")
+	if err != nil {
+		t.Fatalf("Failed to get nut: %v", err)
+	}
+	defer func() { _ = nutResp.Body.Close() }()
+	nutBody, err := io.ReadAll(nutResp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read nut response: %v", err)
+	}
 	nutValues, _ := url.ParseQuery(string(nutBody))
 	nut := nutValues.Get("nut")
 	pag := nutValues.Get("pag")
@@ -312,7 +335,7 @@ func TestPagEndpoint_Pending(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status
 	if resp.StatusCode != http.StatusOK {
@@ -320,7 +343,10 @@ func TestPagEndpoint_Pending(t *testing.T) {
 	}
 
 	// Body should be empty (authentication pending)
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
 	if len(body) != 0 {
 		t.Logf("Warning: Expected empty response for pending auth, got: %s", string(body))
 	}
@@ -333,8 +359,15 @@ func TestPagEndpoint_JSON(t *testing.T) {
 	defer server.Close()
 
 	// Get nut and pag
-	nutResp, _ := http.Get(server.URL + "/nut.sqrl")
-	nutBody, _ := io.ReadAll(nutResp.Body)
+	nutResp, err := http.Get(server.URL + "/nut.sqrl")
+	if err != nil {
+		t.Fatalf("Failed to get nut: %v", err)
+	}
+	defer func() { _ = nutResp.Body.Close() }()
+	nutBody, err := io.ReadAll(nutResp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read nut response: %v", err)
+	}
 	nutValues, _ := url.ParseQuery(string(nutBody))
 	nut := nutValues.Get("nut")
 	pag := nutValues.Get("pag")
@@ -347,7 +380,7 @@ func TestPagEndpoint_JSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check content type
 	contentType := resp.Header.Get("Content-Type")
@@ -391,7 +424,7 @@ func TestPagEndpoint_MissingParameters(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to make request: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Should return error
 			if resp.StatusCode == http.StatusOK {
@@ -422,7 +455,7 @@ func TestCliEndpoint_MissingNut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should return error (nut required)
 	if resp.StatusCode == http.StatusOK {
@@ -437,8 +470,15 @@ func TestCliEndpoint_MissingRequiredFields(t *testing.T) {
 	defer server.Close()
 
 	// Get a valid nut
-	nutResp, _ := http.Get(server.URL + "/nut.sqrl")
-	nutBody, _ := io.ReadAll(nutResp.Body)
+	nutResp, err := http.Get(server.URL + "/nut.sqrl")
+	if err != nil {
+		t.Fatalf("Failed to get nut: %v", err)
+	}
+	defer func() { _ = nutResp.Body.Close() }()
+	nutBody, err := io.ReadAll(nutResp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read nut response: %v", err)
+	}
 	nutValues, _ := url.ParseQuery(string(nutBody))
 	nut := nutValues.Get("nut")
 
@@ -475,10 +515,13 @@ func TestCliEndpoint_MissingRequiredFields(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to make request: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Should return error response (but may be 200 with TIF error flags)
-			body, _ := io.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("Failed to read response body: %v", err)
+			}
 
 			t.Logf("✓ %s: status=%d, body=%s", tc.name, resp.StatusCode, string(body)[:min(len(body), 50)])
 		})
@@ -497,7 +540,7 @@ func TestHomepageEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status
 	if resp.StatusCode != http.StatusOK {
@@ -511,7 +554,10 @@ func TestHomepageEndpoint(t *testing.T) {
 	}
 
 	// Verify HTML content
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
 	if !strings.Contains(string(body), "html") {
 		t.Error("Response does not appear to be HTML")
 	}
@@ -528,8 +574,15 @@ func TestFullAuthenticationFlow(t *testing.T) {
 	defer server.Close()
 
 	t.Log("Step 1: Request nut")
-	nutResp, _ := http.Get(server.URL + "/nut.sqrl")
-	nutBody, _ := io.ReadAll(nutResp.Body)
+	nutResp, err := http.Get(server.URL + "/nut.sqrl")
+	if err != nil {
+		t.Fatalf("Failed to get nut: %v", err)
+	}
+	defer func() { _ = nutResp.Body.Close() }()
+	nutBody, err := io.ReadAll(nutResp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read nut response: %v", err)
+	}
 	nutValues, _ := url.ParseQuery(string(nutBody))
 	nut := nutValues.Get("nut")
 	pag := nutValues.Get("pag")
@@ -540,16 +593,30 @@ func TestFullAuthenticationFlow(t *testing.T) {
 	t.Logf("  ✓ Got nut=%s, pag=%s", nut, pag)
 
 	t.Log("Step 2: Generate QR code")
-	qrResp, _ := http.Get(server.URL + "/png.sqrl?nut=" + nut)
-	qrBody, _ := io.ReadAll(qrResp.Body)
+	qrResp, err := http.Get(server.URL + "/png.sqrl?nut=" + nut)
+	if err != nil {
+		t.Fatalf("Failed to get QR code: %v", err)
+	}
+	defer func() { _ = qrResp.Body.Close() }()
+	qrBody, err := io.ReadAll(qrResp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read QR response: %v", err)
+	}
 	if len(qrBody) < 100 {
 		t.Fatal("QR code generation failed")
 	}
 	t.Logf("  ✓ Generated %d byte QR code", len(qrBody))
 
 	t.Log("Step 3: Poll /pag.sqrl (should be pending)")
-	pagResp, _ := http.Get(fmt.Sprintf("%s/pag.sqrl?nut=%s&pag=%s", server.URL, nut, pag))
-	pagBody, _ := io.ReadAll(pagResp.Body)
+	pagResp, err := http.Get(fmt.Sprintf("%s/pag.sqrl?nut=%s&pag=%s", server.URL, nut, pag))
+	if err != nil {
+		t.Fatalf("Failed to poll pag: %v", err)
+	}
+	defer func() { _ = pagResp.Body.Close() }()
+	pagBody, err := io.ReadAll(pagResp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read pag response: %v", err)
+	}
 	if len(pagBody) != 0 {
 		t.Logf("  Warning: Expected empty response, got: %s", string(pagBody))
 	}
@@ -602,8 +669,8 @@ func BenchmarkNutEndpoint(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Request failed: %v", err)
 		}
-		io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_, _ = io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 	}
 }
 
@@ -617,8 +684,8 @@ func BenchmarkPngEndpoint(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Request failed: %v", err)
 		}
-		io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_, _ = io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 	}
 }
 
@@ -650,13 +717,17 @@ func TestSecurityInputValidation(t *testing.T) {
 				// Network errors are acceptable
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Server should handle gracefully (not crash)
 			// Either return error or sanitize input
 			if resp.StatusCode >= 500 {
-				body, _ := io.ReadAll(resp.Body)
-				t.Logf("  Server error (acceptable): %s", string(body)[:min(len(body), 100)])
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					t.Logf("  Failed to read error response: %v", err)
+				} else {
+					t.Logf("  Server error (acceptable): %s", string(body)[:min(len(body), 100)])
+				}
 			}
 
 			t.Logf("  ✓ %s: Handled gracefully (status %d)", tc.name, resp.StatusCode)
