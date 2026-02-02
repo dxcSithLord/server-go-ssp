@@ -321,7 +321,7 @@ func (cr *CliRequest) ValidateLastResponse(lastRepsonse []byte) bool {
 // implementing custom parsers that work directly with []byte to avoid string allocation.
 func ParseCliRequest(r *http.Request) (*CliRequest, error) {
 	// Ensure body is closed even if ReadAll fails
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
