@@ -1,6 +1,8 @@
 module github.com/dxcSithLord/server-go-ssp
 
-go 1.24
+go 1.25.1
+
+toolchain go1.25.7
 
 require (
 	github.com/yeqown/go-qrcode/v2 v2.2.5
