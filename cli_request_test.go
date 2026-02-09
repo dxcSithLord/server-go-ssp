@@ -1,6 +1,7 @@
 package ssp
 
 import (
+	"crypto/ed25519"
 	"testing"
 )
 
@@ -395,5 +396,337 @@ func BenchmarkClientBodyEncode(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cb.Encode()
+	}
+}
+
+// Signature verification tests
+
+func TestVerifySignature_Valid(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	idk := Sqrl64.EncodeToString(pub)
+	cb := &ClientBody{
+		Version: []int{1},
+		Cmd:     "query",
+		Idk:     idk,
+	}
+	clientEncoded := string(cb.Encode())
+	server := Sqrl64.EncodeToString([]byte("ver=1\r\nnut=test\r\ntif=0\r\n"))
+
+	signingString := clientEncoded + server
+	sig := ed25519.Sign(priv, []byte(signingString))
+	ids := Sqrl64.EncodeToString(sig)
+
+	cr := &CliRequest{
+		Client:        cb,
+		ClientEncoded: clientEncoded,
+		Server:        server,
+		Ids:           ids,
+	}
+
+	err = cr.VerifySignature()
+	if err != nil {
+		t.Errorf("Expected valid signature, got error: %v", err)
+	}
+}
+
+func TestVerifySignature_Invalid(t *testing.T) {
+	pub, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	// Sign with a different key
+	_, wrongPriv, _ := ed25519.GenerateKey(nil)
+
+	idk := Sqrl64.EncodeToString(pub)
+	cb := &ClientBody{
+		Version: []int{1},
+		Cmd:     "query",
+		Idk:     idk,
+	}
+	clientEncoded := string(cb.Encode())
+	server := "server-data"
+
+	signingString := clientEncoded + server
+	sig := ed25519.Sign(wrongPriv, []byte(signingString))
+	ids := Sqrl64.EncodeToString(sig)
+
+	cr := &CliRequest{
+		Client:        cb,
+		ClientEncoded: clientEncoded,
+		Server:        server,
+		Ids:           ids,
+	}
+
+	err = cr.VerifySignature()
+	if err == nil {
+		t.Error("Expected signature verification to fail with wrong key")
+	}
+}
+
+func TestVerifySignature_InvalidIds(t *testing.T) {
+	pub, _, _ := ed25519.GenerateKey(nil)
+	idk := Sqrl64.EncodeToString(pub)
+
+	cr := &CliRequest{
+		Client: &ClientBody{
+			Version: []int{1},
+			Cmd:     "query",
+			Idk:     idk,
+		},
+		ClientEncoded: "client",
+		Server:        "server",
+		Ids:           "!!!not-base64!!!",
+	}
+
+	err := cr.VerifySignature()
+	if err == nil {
+		t.Error("Expected error for invalid ids encoding")
+	}
+}
+
+func TestVerifySignature_InvalidIdk(t *testing.T) {
+	cr := &CliRequest{
+		Client: &ClientBody{
+			Version: []int{1},
+			Cmd:     "query",
+			Idk:     "too-short", // Not a valid 32-byte key
+		},
+		ClientEncoded: "client",
+		Server:        "server",
+		Ids:           Sqrl64.EncodeToString([]byte("fake-sig-64-bytes-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")),
+	}
+
+	err := cr.VerifySignature()
+	if err == nil {
+		t.Error("Expected error for invalid idk")
+	}
+}
+
+func TestVerifySignature_WithPidk(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	pidkPub, pidkPriv, _ := ed25519.GenerateKey(nil)
+
+	idk := Sqrl64.EncodeToString(pub)
+	pidk := Sqrl64.EncodeToString(pidkPub)
+
+	cb := &ClientBody{
+		Version: []int{1},
+		Cmd:     "ident",
+		Idk:     idk,
+		Pidk:    pidk,
+	}
+	clientEncoded := string(cb.Encode())
+	server := "server-data"
+
+	signingString := clientEncoded + server
+	idsSig := ed25519.Sign(priv, []byte(signingString))
+	pidsSig := ed25519.Sign(pidkPriv, []byte(signingString))
+
+	cr := &CliRequest{
+		Client:        cb,
+		ClientEncoded: clientEncoded,
+		Server:        server,
+		Ids:           Sqrl64.EncodeToString(idsSig),
+		Pids:          Sqrl64.EncodeToString(pidsSig),
+	}
+
+	err := cr.VerifySignature()
+	if err != nil {
+		t.Errorf("Expected valid signature with pidk, got: %v", err)
+	}
+}
+
+func TestVerifyPidsSignature_InvalidPidk(t *testing.T) {
+	cr := &CliRequest{
+		Client: &ClientBody{
+			Pidk: "too-short",
+		},
+		ClientEncoded: "client",
+		Server:        "server",
+		Pids:          Sqrl64.EncodeToString([]byte("fake")),
+	}
+
+	err := cr.VerifyPidsSignature()
+	if err == nil {
+		t.Error("Expected error for invalid pidk")
+	}
+}
+
+func TestVerifyUrs_Valid(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	vuk := Sqrl64.EncodeToString(pub)
+
+	cr := &CliRequest{
+		ClientEncoded: "client-data",
+		Server:        "server-data",
+	}
+	signingString := cr.SigningString()
+	ursSig := ed25519.Sign(priv, signingString)
+
+	cr.Urs = Sqrl64.EncodeToString(ursSig)
+
+	err := cr.VerifyUrs(vuk)
+	if err != nil {
+		t.Errorf("Expected valid urs, got: %v", err)
+	}
+}
+
+func TestVerifyUrs_InvalidSig(t *testing.T) {
+	pub, _, _ := ed25519.GenerateKey(nil)
+	_, wrongPriv, _ := ed25519.GenerateKey(nil)
+	vuk := Sqrl64.EncodeToString(pub)
+
+	cr := &CliRequest{
+		ClientEncoded: "client-data",
+		Server:        "server-data",
+	}
+	signingString := cr.SigningString()
+	ursSig := ed25519.Sign(wrongPriv, signingString) // Wrong key
+
+	cr.Urs = Sqrl64.EncodeToString(ursSig)
+
+	err := cr.VerifyUrs(vuk)
+	if err == nil {
+		t.Error("Expected urs verification to fail with wrong key")
+	}
+}
+
+func TestVerifyUrs_EmptyVuk(t *testing.T) {
+	cr := &CliRequest{
+		ClientEncoded: "client",
+		Server:        "server",
+		Urs:           "some-urs",
+	}
+
+	err := cr.VerifyUrs("")
+	if err == nil {
+		t.Error("Expected error for empty vuk")
+	}
+}
+
+func TestVerifyUrs_EmptyUrs(t *testing.T) {
+	cr := &CliRequest{
+		ClientEncoded: "client",
+		Server:        "server",
+		Urs:           "",
+	}
+
+	err := cr.VerifyUrs("some-vuk")
+	if err == nil {
+		t.Error("Expected error for empty urs")
+	}
+}
+
+func TestVerifyUrs_InvalidVuk(t *testing.T) {
+	cr := &CliRequest{
+		ClientEncoded: "client",
+		Server:        "server",
+		Urs:           Sqrl64.EncodeToString([]byte("fake-sig")),
+	}
+
+	// Valid base64 but wrong size
+	err := cr.VerifyUrs(Sqrl64.EncodeToString([]byte("short")))
+	if err == nil {
+		t.Error("Expected error for invalid vuk size")
+	}
+}
+
+func TestPublicKey_Valid(t *testing.T) {
+	pub, _, _ := ed25519.GenerateKey(nil)
+	idk := Sqrl64.EncodeToString(pub)
+
+	cb := &ClientBody{Idk: idk}
+	key, err := cb.PublicKey()
+	if err != nil {
+		t.Fatalf("PublicKey failed: %v", err)
+	}
+	if len(key) != ed25519.PublicKeySize {
+		t.Errorf("Expected %d bytes, got %d", ed25519.PublicKeySize, len(key))
+	}
+}
+
+func TestPublicKey_InvalidSize(t *testing.T) {
+	cb := &ClientBody{Idk: Sqrl64.EncodeToString([]byte("short"))}
+	_, err := cb.PublicKey()
+	if err == nil {
+		t.Error("Expected error for invalid key size")
+	}
+}
+
+func TestPublicKey_InvalidEncoding(t *testing.T) {
+	cb := &ClientBody{Idk: "!!!invalid!!!"}
+	_, err := cb.PublicKey()
+	if err == nil {
+		t.Error("Expected error for invalid encoding")
+	}
+}
+
+func TestPidkPublicKey_Valid(t *testing.T) {
+	pub, _, _ := ed25519.GenerateKey(nil)
+	pidk := Sqrl64.EncodeToString(pub)
+
+	cb := &ClientBody{Pidk: pidk}
+	key, err := cb.PidkPublicKey()
+	if err != nil {
+		t.Fatalf("PidkPublicKey failed: %v", err)
+	}
+	if len(key) != ed25519.PublicKeySize {
+		t.Errorf("Expected %d bytes, got %d", ed25519.PublicKeySize, len(key))
+	}
+}
+
+func TestPidkPublicKey_InvalidSize(t *testing.T) {
+	cb := &ClientBody{Pidk: Sqrl64.EncodeToString([]byte("short"))}
+	_, err := cb.PidkPublicKey()
+	if err == nil {
+		t.Error("Expected error for invalid pidk size")
+	}
+}
+
+func TestSigningString_BuildsFromClientEncode(t *testing.T) {
+	cb := &ClientBody{
+		Version: []int{1},
+		Cmd:     "query",
+		Idk:     "testidk",
+	}
+	cr := &CliRequest{
+		Client: cb,
+		Server: "server-data",
+	}
+
+	result := cr.SigningString()
+	// Should have set ClientEncoded
+	if cr.ClientEncoded == "" {
+		t.Error("Expected ClientEncoded to be populated")
+	}
+	expected := cr.ClientEncoded + "server-data"
+	if string(result) != expected {
+		t.Errorf("Expected %s, got %s", expected, string(result))
+	}
+}
+
+func BenchmarkVerifySignature(b *testing.B) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	idk := Sqrl64.EncodeToString(pub)
+	cb := &ClientBody{Version: []int{1}, Cmd: "query", Idk: idk}
+	clientEncoded := string(cb.Encode())
+	server := "server-data"
+	sig := ed25519.Sign(priv, []byte(clientEncoded+server))
+	ids := Sqrl64.EncodeToString(sig)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cr := &CliRequest{
+			Client:        cb,
+			ClientEncoded: clientEncoded,
+			Server:        server,
+			Ids:           ids,
+		}
+		_ = cr.VerifySignature()
 	}
 }
