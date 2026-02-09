@@ -13,7 +13,7 @@
 
 | Component | go.mod `go` directive | go.mod `toolchain` | Local Go binary | CI version |
 |-----------|----------------------|--------------------|-----------------|------------|
-| **server-go-ssp** | `go 1.25.1` | `go1.25.7` | go1.25.1 (also go1.24.7) | `1.25` (setup-go resolves latest) |
+| **server-go-ssp** | `go 1.25.0` | `go1.25.7` | go1.25.1 (also go1.24.7) | `1.25` (setup-go resolves latest) |
 | **server-go-ssp-gormauthstore** | `go 1.24.0` | `go1.24.7` | go1.24.7 | `1.24.x` |
 
 ### Latest Stable Releases (as of 2026-02-08)
@@ -84,7 +84,7 @@ Previous estimate: 73% (32/44 tasks). **Actual: 91% (48/53 tasks)**
 
 1. Updated `go.mod`:
    ```
-   go 1.25.1
+   go 1.25.0
    toolchain go1.25.7
    ```
 
@@ -111,7 +111,7 @@ The CI workflow (`ci.yml`) already specifies `go-version: '1.25'` throughout. Th
 
 _(Being done in the gormauthstore repo, separate session)_
 
-1. Update go.mod: `go 1.25.1` / `toolchain go1.25.7`
+1. Update go.mod: `go 1.25.0` / `toolchain go1.25.7`
 2. Update server-go-ssp dependency to new commit
 3. Run `go mod tidy`
 4. Run full test suite (100 tests, 10 benchmarks)
@@ -144,15 +144,15 @@ _(Being done in the gormauthstore repo, separate session)_
 
 With go.mod containing:
 ```
-go 1.25.1
+go 1.25.0
 toolchain go1.25.7
 ```
 
-- `go 1.25.1`: minimum language version; consumers need Go >= 1.25.1
+- `go 1.25.0`: minimum language version; consumers need Go >= 1.25.0
 - `toolchain go1.25.7`: preferred toolchain; Go will auto-download if needed
 - `GOTOOLCHAIN=go1.25.1`: forces use of local 1.25.1 (for offline environments)
 - CI with `setup-go: '1.25'` resolves to latest 1.25.x (currently 1.25.7)
-- gormauthstore will need to upgrade from `go 1.24.0` to at least `go 1.25.1` to consume this module
+- gormauthstore will need to upgrade from `go 1.24.0` to at least `go 1.25.0` to consume this module
 
 ---
 
