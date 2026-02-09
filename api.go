@@ -62,7 +62,7 @@ type SqrlIdentity struct {
 	Idk      string `json:"idk" sql:"primary_key"`
 	Suk      string `json:"suk"`
 	Vuk      string `json:"vuk"`
-	Pidk     string `json:"pidk"` // TODO do we need to keep track of Pidk?
+	Pidk     string `json:"pidk"` // Required for identity rekeying (DECISION-005)
 	SQRLOnly bool   `json:"sqrlOnly"`
 	Hardlock bool   `json:"hardlock"`
 	Disabled bool   `json:"disabled"`

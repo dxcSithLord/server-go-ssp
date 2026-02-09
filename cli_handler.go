@@ -229,7 +229,7 @@ func (api *SqrlSspAPI) checkPreviousSwap(previousIdentity, identity *SqrlIdentit
 		}
 		// SECURITY: Use safe logging without exposing full identity details
 		SafeLogAuth("identity_swap", identity.Idk, true)
-		// TODO should we clear the PreviousIDMatch here?
+		// Per SQRL spec: clear PreviousIDMatch after successful swap
 		response.ClearPreviousIDMatch()
 	}
 	return nil
@@ -315,7 +315,8 @@ func (api *SqrlSspAPI) knownIdentity(req *CliRequest, response *CliResponse, ide
 		err := req.VerifyUrs(identity.Vuk)
 		if err != nil {
 			SafeLogError("urs_validation", err)
-			// TODO: remove since sig check failed here?
+			// Per SQRL protocol (DECISION-004): Do NOT remove/disable identity on
+			// signature failure. Only set error flags and return.
 			if identity.Disabled {
 				response.WithSQRLDisabled()
 			}

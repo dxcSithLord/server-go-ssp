@@ -107,15 +107,17 @@ The CI workflow (`ci.yml`) already specifies `go-version: '1.25'` throughout. Th
 1. Merge this branch's changes to master
 2. Note the new commit hash for gormauthstore to reference
 
-### Phase C: Upgrade gormauthstore
+### Phase C: Upgrade gormauthstore -- IN PROGRESS
 
-_(Coordinate with gormauthstore repo)_
+_(Being done in the gormauthstore repo, separate session)_
 
 1. Update go.mod: `go 1.25.1` / `toolchain go1.25.7`
-2. Update server-go-ssp dependency: `go get github.com/dxcSithLord/server-go-ssp@<new-hash>`
+2. Update server-go-ssp dependency to new commit
 3. Run `go mod tidy`
 4. Run full test suite (100 tests, 10 benchmarks)
 5. Proceed with TASK-041 (tag v1.0.0)
+
+**Status (2026-02-08):** gormauthstore is being upgraded to Go 1.25.
 
 ### Phase D: Verify Integration
 
