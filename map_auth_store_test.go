@@ -115,7 +115,7 @@ func TestMapAuthStore_MultipleIdentities(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		identity := &SqrlIdentity{
-			Idk: Nut("idk-" + string(rune('A'+i))).String(),
+			Idk: string(Nut("idk-" + string(rune('A'+i)))),
 			Suk: "suk",
 		}
 		if err := store.SaveIdentity(identity); err != nil {
@@ -125,7 +125,7 @@ func TestMapAuthStore_MultipleIdentities(t *testing.T) {
 
 	// Verify they all exist
 	for i := 0; i < 10; i++ {
-		idk := Nut("idk-" + string(rune('A'+i))).String()
+		idk := string(Nut("idk-" + string(rune('A'+i))))
 		_, err := store.FindIdentity(idk)
 		if err != nil {
 			t.Errorf("FindIdentity for %s failed: %v", idk, err)
@@ -154,10 +154,6 @@ func TestMapAuthStore_DisabledIdentity(t *testing.T) {
 	if !found.Disabled {
 		t.Error("Expected identity to be disabled")
 	}
-}
-
-func (n Nut) String() string {
-	return string(n)
 }
 
 func BenchmarkMapAuthStore_Save(b *testing.B) {
