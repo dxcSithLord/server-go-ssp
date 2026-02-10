@@ -27,6 +27,9 @@ jobs:
         with:
           go-version: '1.25'
           cache: true
+          cache-dependency-path: |
+            go.sum
+            go.mod
 
       - name: Run Gosec Security Scanner
         # SECURITY: Pinned to specific commit SHA for v2.22.10 (immutable)
@@ -71,6 +74,9 @@ jobs:
         with:
           go-version: '1.25'
           cache: true
+          cache-dependency-path: |
+            go.sum
+            go.mod
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
@@ -109,6 +115,9 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
+          cache-dependency-path: |
+            go.sum
+            go.mod
 
       - name: Get dependencies
         run: go mod download
@@ -161,7 +170,29 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
-          cache: true
+          cache: false
+
+      - name: Cache Go modules and build cache
+        uses: actions/cache@v4
+        id: go-cache
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-
+            ${{ runner.os }}-go-
+
+      - name: Verify cache and download dependencies
+        run: |
+          if [ "${{ steps.go-cache.outputs.cache-hit }}" != "true" ]; then
+            echo "Cache miss - downloading dependencies"
+          else
+            echo "Cache hit - verifying cache integrity"
+          fi
+          go mod download
+          go mod verify
 
       - name: Build library
         env:
@@ -237,6 +268,9 @@ jobs:
         with:
           go-version: '1.25'
           cache: true
+          cache-dependency-path: |
+            go.sum
+            go.mod
 
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
@@ -257,6 +291,9 @@ jobs:
         with:
           go-version: '1.25'
           cache: true
+          cache-dependency-path: |
+            go.sum
+            go.mod
 
       - name: Run benchmarks
         run: go test -bench=. -benchmem -run=^$ ./...
