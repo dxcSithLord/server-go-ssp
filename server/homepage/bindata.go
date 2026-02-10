@@ -42,7 +42,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
-		return nil, err
+		return nil, clErr
 	}
 
 	return buf.Bytes(), nil
@@ -390,7 +390,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
