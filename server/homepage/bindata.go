@@ -94,7 +94,7 @@ func Ds_store() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: ".DS_Store", size: 6148, mode: os.FileMode(0420), modTime: time.Unix(1562865155, 0)}
+	info := bindataFileInfo{name: ".DS_Store", size: 6148, mode: os.FileMode(0644), modTime: time.Unix(1562865155, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -114,7 +114,7 @@ func _100x100sqrllogoPng() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "100x100SQRLLogo.png", size: 3389, mode: os.FileMode(0436), modTime: time.Unix(1562794725, 0)}
+	info := bindataFileInfo{name: "100x100SQRLLogo.png", size: 3389, mode: os.FileMode(0664), modTime: time.Unix(1562794725, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -134,7 +134,7 @@ func signInWithSqrlButtonPng() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "Sign-in-with-SQRL-button.png", size: 1816, mode: os.FileMode(0436), modTime: time.Unix(1562794725, 0)}
+	info := bindataFileInfo{name: "Sign-in-with-SQRL-button.png", size: 1816, mode: os.FileMode(0664), modTime: time.Unix(1562794725, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -154,7 +154,7 @@ func bindataGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bindata.go", size: 53248, mode: os.FileMode(0420), modTime: time.Unix(1563294195, 0)}
+	info := bindataFileInfo{name: "bindata.go", size: 53248, mode: os.FileMode(0644), modTime: time.Unix(1563294195, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -174,7 +174,7 @@ func darkbluepixelGif() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "darkbluepixel.gif", size: 34, mode: os.FileMode(0436), modTime: time.Unix(1562794725, 0)}
+	info := bindataFileInfo{name: "darkbluepixel.gif", size: 34, mode: os.FileMode(0664), modTime: time.Unix(1562794725, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -194,7 +194,7 @@ func sqrl_demoHtml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "sqrl_demo.html", size: 5647, mode: os.FileMode(0438), modTime: time.Unix(1563294167, 0)}
+	info := bindataFileInfo{name: "sqrl_demo.html", size: 5647, mode: os.FileMode(0666), modTime: time.Unix(1563294167, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -214,7 +214,7 @@ func sqrlapiCss() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "sqrlapi.css", size: 1908, mode: os.FileMode(0436), modTime: time.Unix(1562794725, 0)}
+	info := bindataFileInfo{name: "sqrlapi.css", size: 1908, mode: os.FileMode(0664), modTime: time.Unix(1562794725, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -234,7 +234,7 @@ func sqrlapiJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "sqrlapi.js", size: 5834, mode: os.FileMode(0436), modTime: time.Unix(1563237257, 0)}
+	info := bindataFileInfo{name: "sqrlapi.js", size: 5834, mode: os.FileMode(0664), modTime: time.Unix(1563237257, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -254,7 +254,7 @@ func successHtml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "success.html", size: 841, mode: os.FileMode(0420), modTime: time.Unix(1562894854, 0)}
+	info := bindataFileInfo{name: "success.html", size: 841, mode: os.FileMode(0644), modTime: time.Unix(1562894854, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
