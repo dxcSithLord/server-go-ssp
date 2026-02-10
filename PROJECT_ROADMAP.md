@@ -27,7 +27,7 @@ This roadmap consolidates all work streams for the SQRL SSP server implementatio
 
 ## Phase 1: Foundation ✅ COMPLETED
 
-**Timeline:** Completed November 17, 2025
+**Timeline:** Started November 17, 2025; Go version completed February 8, 2026
 **Status:** ✅ All objectives achieved
 
 ### Objectives
@@ -36,11 +36,14 @@ Establish solid foundation with modern Go version and clean dependencies
 ### Completed Tasks
 
 #### 1.1 Go Version Upgrade ✅
-- ✅ Updated go.mod to 1.25.0
-- ✅ Set toolchain to go1.25.4 (latest patch)
-- ✅ Updated all GitHub Actions workflows
-- ✅ Verified all tests pass
-- ✅ Documented in UPGRADE_GO_1_25.md
+- ✅ Updated go.mod to `go 1.25` with `toolchain go1.25.7`
+- ✅ Updated all GitHub Actions workflows (target `1.25`)
+- ✅ All 89 tests pass on Go 1.25 (including previously-failing TestPngEndpoint_InvalidNut)
+- ✅ Documented in UPGRADE_GO_1_25.md and GO_VERSION_ALIGNMENT_PLAN.md
+
+**Note:** Go version was temporarily reverted to 1.24 in Dec 2025 due to network blocker
+for 1.25.4 toolchain download. Re-applied Feb 2026 using locally-available go1.25.1.  
+and set to go1.25 for CI chain to work.
 
 **Evidence:** go.mod, .github/workflows/ci.yml
 
@@ -71,7 +74,7 @@ Establish solid foundation with modern Go version and clean dependencies
 **Evidence:** Test files, coverage reports
 
 ### Outcomes
-- Modern, supported Go version (1.25.4)
+- Modern, supported Go version (1.25, toolchain 1.25.7)
 - Zero high/critical dependency vulnerabilities
 - Comprehensive security documentation
 - Solid testing foundation
@@ -81,8 +84,8 @@ Establish solid foundation with modern Go version and clean dependencies
 
 ## Phase 2: Security Hardening 🔄 IN PROGRESS
 
-**Timeline:** November 19-30, 2025 (Estimated)
-**Status:** 🔄 Active development
+**Timeline:** Started November 19, 2025; resumed February 8, 2026
+**Status:** 🔄 Resumed -- no Phase 2 code changes were made Nov 2025 - Feb 2026
 **Priority:** C (Critical security tasks)
 
 ### Objectives
@@ -247,24 +250,18 @@ golangci-lint run --timeout=5m
 - Notice_Of_Decision.md: C-001, C-002
 - SECURITY_REVIEW.md Section 6
 
-#### 2.5 Go 1.25 Breaking Changes Resolution - Immediate (Task 4) 🔄
-**Status:** IN PROGRESS
+#### 2.5 Go 1.25 Breaking Changes Resolution ✅
+**Status:** COMPLETED (February 8, 2026)
 **Owner:** Development team
-**Target Completion:** November 22, 2025
 
-**Tasks:**
-- [ ] Verify no usage of deprecated go/ast functions
-- [ ] Check for testing/synctest.Run usage
-- [ ] Run go vet ./... and address all warnings
-- [ ] Test with -race flag
-- [ ] Test with -asan flag (memory leak detection)
-- [ ] Document any issues found and resolutions
+**Results:**
+- [x] go vet ./... returns clean on Go 1.25.1
+- [x] go test -race ./... passes (all 89 tests)
+- [x] No deprecation warnings
+- [x] go build ./... succeeds
+- [ ] Test with -asan flag (memory leak detection) -- deferred, requires CGo
 
-**Success Criteria:**
-- go vet ./... returns clean
-- go test -race ./... passes
-- No deprecation warnings
-- All tests pass on Go 1.25.4
+**Note:** Go 1.25.1 used locally; toolchain go1.25.7 set for CI.
 
 **References:**
 - UPGRADE_GO_1_25.md Phase 1.2, Phase 2.2
@@ -922,12 +919,12 @@ Maintain security, performance, and compatibility
 
 | Phase | Start | End | Duration | Status |
 |-------|-------|-----|----------|--------|
-| Phase 1 | Nov 1 | Nov 17 | 17 days | ✅ COMPLETED |
-| Phase 2 | Nov 19 | Nov 30 | 12 days | 🔄 IN PROGRESS |
-| Phase 3 | Dec 1 | Dec 15 | 15 days | 📋 PLANNED |
-| Phase 4 | Dec 16 | Jan 15 | 31 days | 📋 PLANNED |
-| Phase 5 | Jan 16 | Jan 31 | 16 days | 📋 PLANNED |
-| Phase 6 | Feb 1 | Ongoing | Ongoing | 📋 PLANNED |
+| Phase 1 | Nov 17 | Feb 8 | Go version delayed by network | ✅ COMPLETED |
+| Phase 2 | Feb 8 | TBD | Resumed Feb 2026 | 🔄 IN PROGRESS |
+| Phase 3 | TBD | TBD | After Phase 2 | 📋 PLANNED |
+| Phase 4 | TBD | TBD | After Phase 3 | 📋 PLANNED |
+| Phase 5 | TBD | TBD | After Phase 4 | 📋 PLANNED |
+| Phase 6 | TBD | Ongoing | Ongoing | 📋 PLANNED |
 
 **Total Project Timeline:** ~3 months to production release
 **Ongoing Maintenance:** Indefinite
@@ -941,6 +938,10 @@ Maintain security, performance, and compatibility
 | 2025-11-19 | Initial consolidated roadmap created | All | Security Review Team |
 | 2025-11-19 | Phase 1 marked complete | 1 | Security Review Team |
 | 2025-11-19 | Phase 2 tasks detailed | 2 | Security Review Team |
+| 2026-02-08 | Go version upgrade completed (1.25/1.25.7) | 1 | Claude Code |
+| 2026-02-08 | Phase 1 timeline corrected (Go revert noted) | 1 | Claude Code |
+| 2026-02-08 | Phase 2 resumed, timeline corrected | 2 | Claude Code |
+| 2026-02-08 | Cross-repo decision alignment documented | All | Claude Code |
 
 ---
 
