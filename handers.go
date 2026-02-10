@@ -64,11 +64,11 @@ func (api *SqrlSspAPI) Nut(w http.ResponseWriter, r *http.Request) {
 func (api *SqrlSspAPI) createAndSaveNut(r *http.Request) (*HoardCache, error) {
 	nut, err := api.tree.Nut()
 	if err != nil {
-		return nil, fmt.Errorf("Failed generating nut: %v", err)
+		return nil, fmt.Errorf("failed generating nut: %v", err)
 	}
 	pagnut, err := api.tree.Nut()
 	if err != nil {
-		return nil, fmt.Errorf("Failed generating nut: %v", err)
+		return nil, fmt.Errorf("failed generating nut: %v", err)
 	}
 
 	hoardCache := &HoardCache{

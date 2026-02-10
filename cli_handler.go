@@ -287,7 +287,7 @@ func (api *SqrlSspAPI) requestValidations(hoardCache *HoardCache, req *CliReques
 
 	if !supportedCommands[req.Client.Cmd] {
 		response.WithFunctionNotSupported()
-		return fmt.Errorf("Uknown command: %v", req.Client.Cmd)
+		return fmt.Errorf("unknown command: %v", req.Client.Cmd)
 	}
 
 	return nil

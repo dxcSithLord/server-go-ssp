@@ -136,7 +136,7 @@ func encodeButton(button, url string) string {
 }
 
 func removeSemi(v string) string {
-	return strings.Replace(v, ";", "", -1)
+	return strings.ReplaceAll(v, ";", "")
 }
 
 // NewCliResponse creates a minimal valid CliResponse object
