@@ -229,7 +229,7 @@ func (api *SqrlSspAPI) checkPreviousSwap(previousIdentity, identity *SqrlIdentit
 		}
 		// SECURITY: Use safe logging without exposing full identity details
 		SafeLogAuth("identity_swap", identity.Idk, true)
-		// TODO should we clear the PreviousIDMatch here?
+		// Per SQRL spec: clear PreviousIDMatch after successful swap
 		response.ClearPreviousIDMatch()
 	}
 	return nil
@@ -287,7 +287,7 @@ func (api *SqrlSspAPI) requestValidations(hoardCache *HoardCache, req *CliReques
 
 	if !supportedCommands[req.Client.Cmd] {
 		response.WithFunctionNotSupported()
-		return fmt.Errorf("Uknown command: %v", req.Client.Cmd)
+		return fmt.Errorf("unknown command: %v", req.Client.Cmd)
 	}
 
 	return nil
@@ -309,24 +309,28 @@ func (api *SqrlSspAPI) knownIdentity(req *CliRequest, response *CliResponse, ide
 	identity.Btn = req.Client.Btn
 	changed := false
 	if req.IsAuthCommand() {
-		changed = req.UpdateIdentity(identity)
+		// UpdateIdentity returns true if unchanged, false if changed
+		// Negate to get the correct "changed" semantics
+		changed = !req.UpdateIdentity(identity)
 	}
 	if req.Client.Cmd == "enable" || req.Client.Cmd == "remove" {
 		err := req.VerifyUrs(identity.Vuk)
 		if err != nil {
 			SafeLogError("urs_validation", err)
-			// TODO: remove since sig check failed here?
+			// Per SQRL protocol (DECISION-004): Do NOT remove/disable identity on
+			// signature failure. Only set error flags and return.
 			if identity.Disabled {
 				response.WithSQRLDisabled()
 			}
 			response.WithClientFailure().WithCommandFailed()
 			return fmt.Errorf("identity error")
 		}
-		if req.Client.Cmd == "enable" {
+		switch req.Client.Cmd {
+		case "enable":
 			SafeLogAuth("enable_account", identity.Idk, true)
 			identity.Disabled = false
 			changed = true
-		} else if req.Client.Cmd == "remove" {
+		case "remove":
 			err := api.removeIdentity(identity)
 			if err != nil {
 				SafeLogError("remove_identity", err)

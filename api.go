@@ -37,7 +37,7 @@ type Tree interface {
 // ErrNotFound specific error returned if a Hoard
 // or identity isn't found. This is to differentiate
 // from more serious errors at the storage level
-var ErrNotFound = fmt.Errorf("Not Found")
+var ErrNotFound = fmt.Errorf("not found")
 
 // Hoard stores Nuts for later use
 type Hoard interface {
@@ -62,7 +62,7 @@ type SqrlIdentity struct {
 	Idk      string `json:"idk" sql:"primary_key"`
 	Suk      string `json:"suk"`
 	Vuk      string `json:"vuk"`
-	Pidk     string `json:"pidk"` // TODO do we need to keep track of Pidk?
+	Pidk     string `json:"pidk"` // Required for identity rekeying (DECISION-005)
 	SQRLOnly bool   `json:"sqrlOnly"`
 	Hardlock bool   `json:"hardlock"`
 	Disabled bool   `json:"disabled"`

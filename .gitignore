@@ -1,0 +1,12 @@
+# Test artifacts
+coverage.out
+*.test
+
+# Binary output
+sqrl-server-*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

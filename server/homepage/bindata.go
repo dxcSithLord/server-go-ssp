@@ -18,7 +18,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +27,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("Read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -40,10 +39,10 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("Read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
-		return nil, err
+		return nil, clErr
 	}
 
 	return buf.Bytes(), nil
@@ -95,7 +94,7 @@ func Ds_store() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: ".DS_Store", size: 6148, mode: os.FileMode(420), modTime: time.Unix(1562865155, 0)}
+	info := bindataFileInfo{name: ".DS_Store", size: 6148, mode: os.FileMode(0644), modTime: time.Unix(1562865155, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -115,7 +114,7 @@ func _100x100sqrllogoPng() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "100x100SQRLLogo.png", size: 3389, mode: os.FileMode(436), modTime: time.Unix(1562794725, 0)}
+	info := bindataFileInfo{name: "100x100SQRLLogo.png", size: 3389, mode: os.FileMode(0664), modTime: time.Unix(1562794725, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -135,7 +134,7 @@ func signInWithSqrlButtonPng() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "Sign-in-with-SQRL-button.png", size: 1816, mode: os.FileMode(436), modTime: time.Unix(1562794725, 0)}
+	info := bindataFileInfo{name: "Sign-in-with-SQRL-button.png", size: 1816, mode: os.FileMode(0664), modTime: time.Unix(1562794725, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -155,7 +154,7 @@ func bindataGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bindata.go", size: 53248, mode: os.FileMode(420), modTime: time.Unix(1563294195, 0)}
+	info := bindataFileInfo{name: "bindata.go", size: 53248, mode: os.FileMode(0644), modTime: time.Unix(1563294195, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -175,7 +174,7 @@ func darkbluepixelGif() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "darkbluepixel.gif", size: 34, mode: os.FileMode(436), modTime: time.Unix(1562794725, 0)}
+	info := bindataFileInfo{name: "darkbluepixel.gif", size: 34, mode: os.FileMode(0664), modTime: time.Unix(1562794725, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -195,7 +194,7 @@ func sqrl_demoHtml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "sqrl_demo.html", size: 5647, mode: os.FileMode(438), modTime: time.Unix(1563294167, 0)}
+	info := bindataFileInfo{name: "sqrl_demo.html", size: 5647, mode: os.FileMode(0666), modTime: time.Unix(1563294167, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -215,7 +214,7 @@ func sqrlapiCss() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "sqrlapi.css", size: 1908, mode: os.FileMode(436), modTime: time.Unix(1562794725, 0)}
+	info := bindataFileInfo{name: "sqrlapi.css", size: 1908, mode: os.FileMode(0664), modTime: time.Unix(1562794725, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -235,7 +234,7 @@ func sqrlapiJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "sqrlapi.js", size: 5834, mode: os.FileMode(436), modTime: time.Unix(1563237257, 0)}
+	info := bindataFileInfo{name: "sqrlapi.js", size: 5834, mode: os.FileMode(0664), modTime: time.Unix(1563237257, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -255,7 +254,7 @@ func successHtml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "success.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1562894854, 0)}
+	info := bindataFileInfo{name: "success.html", size: 841, mode: os.FileMode(0644), modTime: time.Unix(1562894854, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -264,7 +263,7 @@ func successHtml() (*asset, error) {
 // It returns an error if the asset could not be found or
 // could not be loaded.
 func Asset(name string) ([]byte, error) {
-	cannonicalName := strings.Replace(name, "\\", "/", -1)
+	cannonicalName := strings.ReplaceAll(name, "\\", "/")
 	if f, ok := _bindata[cannonicalName]; ok {
 		a, err := f()
 		if err != nil {
@@ -290,7 +289,7 @@ func MustAsset(name string) []byte {
 // It returns an error if the asset could not be found or
 // could not be loaded.
 func AssetInfo(name string) (os.FileInfo, error) {
-	cannonicalName := strings.Replace(name, "\\", "/", -1)
+	cannonicalName := strings.ReplaceAll(name, "\\", "/")
 	if f, ok := _bindata[cannonicalName]; ok {
 		a, err := f()
 		if err != nil {
@@ -341,7 +340,7 @@ var _bindata = map[string]func() (*asset, error){
 func AssetDir(name string) ([]string, error) {
 	node := _bintree
 	if len(name) != 0 {
-		cannonicalName := strings.Replace(name, "\\", "/", -1)
+		cannonicalName := strings.ReplaceAll(name, "\\", "/")
 		pathList := strings.Split(cannonicalName, "/")
 		for _, p := range pathList {
 			node = node.Children[p]
@@ -391,7 +390,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
@@ -420,6 +419,6 @@ func RestoreAssets(dir, name string) error {
 }
 
 func _filePath(dir, name string) string {
-	cannonicalName := strings.Replace(name, "\\", "/", -1)
+	cannonicalName := strings.ReplaceAll(name, "\\", "/")
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }

@@ -25,7 +25,7 @@ func (m *MapAuthStore) FindIdentity(idk string) (*SqrlIdentity, error) {
 		if identity, ok := knownUser.(*SqrlIdentity); ok {
 			return identity, nil
 		}
-		return nil, fmt.Errorf("Wrong type for identity %t", knownUser)
+		return nil, fmt.Errorf("wrong type for identity %t", knownUser)
 	}
 	return nil, ErrNotFound
 }
