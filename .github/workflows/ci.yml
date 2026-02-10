@@ -103,7 +103,7 @@ jobs:
             go.mod
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           # Install from source to ensure it's built with Go 1.25
