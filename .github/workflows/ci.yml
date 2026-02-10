@@ -11,7 +11,7 @@ on:
 
 env:
   GO_VERSION: '1.25'
-  GOLANGCI_LINT_VERSION: 'latest'
+  GOLANGCI_LINT_VERSION: 'v2.8.0'
   GOSEC_VERSION: '6be2b51fd78feca86af91f5186b7964d76cb1256'  # v2.22.10
 
 permissions:
@@ -42,7 +42,7 @@ jobs:
         # v2.22.10 supports Go 1.25.3/1.24.9, released Oct 15, 2025
         # Checksum verification: https://github.com/securego/gosec/releases/download/v2.22.10/gosec_2.22.10_checksums.txt
         # GPG signature: https://github.com/securego/gosec/releases/download/v2.22.10/gosec_2.22.10_checksums.txt.gpg
-        uses: securego/gosec@${{ env.GOSEC_VERSION }} # v2.22.10
+        uses: securego/gosec@6be2b51fd78feca86af91f5186b7964d76cb1256 # v2.22.10
         with:
           args: '-no-fail -fmt sarif -out results.sarif ./...'
 
