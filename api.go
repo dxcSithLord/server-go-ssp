@@ -37,7 +37,7 @@ type Tree interface {
 // ErrNotFound specific error returned if a Hoard
 // or identity isn't found. This is to differentiate
 // from more serious errors at the storage level
-var ErrNotFound = fmt.Errorf("Not Found")
+var ErrNotFound = fmt.Errorf("not found")
 
 // Hoard stores Nuts for later use
 type Hoard interface {

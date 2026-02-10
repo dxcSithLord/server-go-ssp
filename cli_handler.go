@@ -309,7 +309,9 @@ func (api *SqrlSspAPI) knownIdentity(req *CliRequest, response *CliResponse, ide
 	identity.Btn = req.Client.Btn
 	changed := false
 	if req.IsAuthCommand() {
-		changed = req.UpdateIdentity(identity)
+		// UpdateIdentity returns true if unchanged, false if changed
+		// Negate to get the correct "changed" semantics
+		changed = !req.UpdateIdentity(identity)
 	}
 	if req.Client.Cmd == "enable" || req.Client.Cmd == "remove" {
 		err := req.VerifyUrs(identity.Vuk)
@@ -323,11 +325,12 @@ func (api *SqrlSspAPI) knownIdentity(req *CliRequest, response *CliResponse, ide
 			response.WithClientFailure().WithCommandFailed()
 			return fmt.Errorf("identity error")
 		}
-		if req.Client.Cmd == "enable" {
+		switch req.Client.Cmd {
+		case "enable":
 			SafeLogAuth("enable_account", identity.Idk, true)
 			identity.Disabled = false
 			changed = true
-		} else if req.Client.Cmd == "remove" {
+		case "remove":
 			err := api.removeIdentity(identity)
 			if err != nil {
 				SafeLogError("remove_identity", err)
