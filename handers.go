@@ -80,7 +80,7 @@ func (api *SqrlSspAPI) createAndSaveNut(r *http.Request) (*HoardCache, error) {
 	// Store the nut in the hoard under OriginalNut
 	err = api.hoard.Save(nut, hoardCache, api.NutExpiration)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to save a nut: %v", err)
+		return nil, fmt.Errorf("failed to save a nut: %v", err)
 	}
 	// Also store under PagNut for polling (initially in "pending" state)
 	// This allows /pag.sqrl to distinguish between invalid pagnuts (404) and pending auth (200 empty)
@@ -93,7 +93,7 @@ func (api *SqrlSspAPI) createAndSaveNut(r *http.Request) (*HoardCache, error) {
 	}
 	err = api.hoard.Save(pagnut, pendingCache, api.NutExpiration)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to save pagnut: %v", err)
+		return nil, fmt.Errorf("failed to save pagnut: %v", err)
 	}
 	// SECURITY: Sanitize nut and mask IP to prevent log injection
 	SafeLogInfo("Saved nut %s in hoard from %s", sanitizeForLog(string(nut)), maskIP(hoardCache.RemoteIP))
