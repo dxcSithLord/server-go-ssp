@@ -19,7 +19,7 @@ type RandomTree struct {
 // can create larger ones
 func NewRandomTree(byteSize int) (*RandomTree, error) {
 	if byteSize < 8 || byteSize > 20 {
-		return nil, fmt.Errorf("Valid sizes are between 8 and 20 bytes")
+		return nil, fmt.Errorf("valid sizes are between 8 and 20 bytes")
 	}
 	rt := &RandomTree{
 		byteSize:  byteSize,
