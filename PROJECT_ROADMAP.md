@@ -36,13 +36,14 @@ Establish solid foundation with modern Go version and clean dependencies
 ### Completed Tasks
 
 #### 1.1 Go Version Upgrade ✅
-- ✅ Updated go.mod to `go 1.25.1` with `toolchain go1.25.7`
+- ✅ Updated go.mod to `go 1.25` with `toolchain go1.25.7`
 - ✅ Updated all GitHub Actions workflows (target `1.25`)
-- ✅ All 89 tests pass on Go 1.25.1 (including previously-failing TestPngEndpoint_InvalidNut)
+- ✅ All 89 tests pass on Go 1.25 (including previously-failing TestPngEndpoint_InvalidNut)
 - ✅ Documented in UPGRADE_GO_1_25.md and GO_VERSION_ALIGNMENT_PLAN.md
 
 **Note:** Go version was temporarily reverted to 1.24 in Dec 2025 due to network blocker
-for 1.25.4 toolchain download. Re-applied Feb 2026 using locally-available go1.25.1.
+for 1.25.4 toolchain download. Re-applied Feb 2026 using locally-available go1.25.1.  
+and set to go1.25 for CI chain to work.
 
 **Evidence:** go.mod, .github/workflows/ci.yml
 
@@ -73,7 +74,7 @@ for 1.25.4 toolchain download. Re-applied Feb 2026 using locally-available go1.2
 **Evidence:** Test files, coverage reports
 
 ### Outcomes
-- Modern, supported Go version (1.25.1, toolchain 1.25.7)
+- Modern, supported Go version (1.25, toolchain 1.25.7)
 - Zero high/critical dependency vulnerabilities
 - Comprehensive security documentation
 - Solid testing foundation
@@ -937,7 +938,7 @@ Maintain security, performance, and compatibility
 | 2025-11-19 | Initial consolidated roadmap created | All | Security Review Team |
 | 2025-11-19 | Phase 1 marked complete | 1 | Security Review Team |
 | 2025-11-19 | Phase 2 tasks detailed | 2 | Security Review Team |
-| 2026-02-08 | Go version upgrade completed (1.25.1/1.25.7) | 1 | Claude Code |
+| 2026-02-08 | Go version upgrade completed (1.25/1.25.7) | 1 | Claude Code |
 | 2026-02-08 | Phase 1 timeline corrected (Go revert noted) | 1 | Claude Code |
 | 2026-02-08 | Phase 2 resumed, timeline corrected | 2 | Claude Code |
 | 2026-02-08 | Cross-repo decision alignment documented | All | Claude Code |
